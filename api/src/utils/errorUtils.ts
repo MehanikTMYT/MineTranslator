@@ -33,13 +33,13 @@ export class ValidationError extends AppError {
 
 export class ProcessingError extends AppError {
   constructor(message: string, code: ErrorCode = ErrorCode.JAR_PROCESSING_FAILED, details: Record<string, any> = {}) {
-    super(message, code, 400, details);
+    super(message, code, 500, details); // Changed from 400 to 500 for internal processing errors
   }
 }
 
 export class TranslationError extends AppError {
   constructor(message: string, code: ErrorCode = ErrorCode.TRANSLATION_FAILED, details: Record<string, any> = {}) {
-    super(message, code, 400, details);
+    super(message, code, 500, details); // Changed from 400 to 500 for internal processing errors
   }
 }
 
@@ -69,6 +69,32 @@ export const errorHandler = (
         code: err.code,
         statusCode: err.statusCode,
         details: err.details,
+        timestamp: err.timestamp.toISOString(),
+      },
+    });
+    return;
+  }
+
+  // Handle specific error types
+  if (err.name === 'SyntaxError' && err.message.includes('JSON')) {
+    res.status(400).json({
+      success: false,
+      error: {
+        message: 'Invalid JSON format in request body',
+        code: ErrorCode.INVALID_JSON,
+        statusCode: 400,
+      },
+    });
+    return;
+  }
+
+  if (err.name === 'RangeError') {
+    res.status(413).json({
+      success: false,
+      error: {
+        message: 'Request entity too large',
+        code: ErrorCode.VALIDATION_ERROR,
+        statusCode: 413,
       },
     });
     return;
@@ -89,7 +115,7 @@ export const errorHandler = (
 
 export const notFoundHandler = ( 
   req: Request,
-  _: Response, 
+  res: Response, 
   next: NextFunction
 ): void => {
   const error = new AppError(

@@ -39,7 +39,7 @@ export class JarProcessingService {
         throw new ProcessingError('Missing "assets" directory in JAR archive', ErrorCode.JAR_PROCESSING_FAILED, { jarPath });
       }
 
-      const langDirs = FileSystemService.findLangDirectories(assetsDir);
+      const langDirs = await FileSystemService.findLangDirectories(assetsDir);
       if (langDirs.length === 0) {
         throw new ProcessingError('No "lang" directories found in assets', ErrorCode.JAR_PROCESSING_FAILED, { assetsDir });
       }
@@ -52,8 +52,8 @@ export class JarProcessingService {
 
       console.log(`✅ JAR processing completed successfully`);
       
-      FileSystemService.safeDelete(jarPath);
-      FileSystemService.safeDelete(uniqueTempDir, true);
+      await FileSystemService.safeDelete(jarPath);
+      await FileSystemService.safeDelete(uniqueTempDir, true);
 
       return { 
         success: true, 
@@ -64,9 +64,9 @@ export class JarProcessingService {
       };
 
     } catch (error: any) {
-      FileSystemService.safeDelete(jarPath);
+      await FileSystemService.safeDelete(jarPath);
       if (fs.existsSync(uniqueTempDir)) {
-        FileSystemService.safeDelete(uniqueTempDir, true);
+        await FileSystemService.safeDelete(uniqueTempDir, true);
       }
 
       console.error('❌ JAR processing failed:', error.message);
@@ -75,17 +75,14 @@ export class JarProcessingService {
   }
 
   private async extractJar(jarPath: string, targetDir: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        const AdmZip = require('adm-zip');
-        const zip = new AdmZip(jarPath);
-        zip.extractAllTo(targetDir, true);
-        console.log(`📦 JAR extracted to: ${targetDir}`);
-        resolve();
-      } catch (error: any) {
-        reject(new ProcessingError(`Failed to extract JAR: ${error.message}`, ErrorCode.JAR_PROCESSING_FAILED, { jarPath }));
-      }
-    });
+    try {
+      const AdmZip = require('adm-zip');
+      const zip = new AdmZip(jarPath);
+      zip.extractAllTo(targetDir, true);
+      console.log(`📦 JAR extracted to: ${targetDir}`);
+    } catch (error: any) {
+      throw new ProcessingError(`Failed to extract JAR: ${error.message}`, ErrorCode.JAR_PROCESSING_FAILED, { jarPath });
+    }
   }
 
   private async processLangDirectories(langDirs: LangDirectoryInfo[], options: TranslationOptions, tempDir: string): Promise<{ total: number; json: number; lang: number }> {
@@ -116,7 +113,7 @@ export class JarProcessingService {
             }
 
             if (translatedResult.success && translatedResult.data && langDir.ruRuFile) {
-              fs.writeFileSync(langDir.ruRuFile, JSON.stringify(translatedResult.data, null, 4), 'utf8');
+              await fs.promises.writeFile(langDir.ruRuFile, JSON.stringify(translatedResult.data, null, 4), 'utf8');
               console.log(`✅ JSON translation saved to: ${langDir.ruRuFile}`);
               jsonCount++;
               totalProcessed++;

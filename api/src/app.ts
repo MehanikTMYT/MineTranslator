@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import rateLimit from 'express-rate-limit';
 import { config, ensureDirectories } from './config/config';
 import jarRoutes from './routes/jarRoutes';
 import { errorHandler, notFoundHandler } from './utils/errorUtils';
@@ -12,17 +13,50 @@ export class Application {
 
   constructor() {
     this.app = express();
+    this.setupSecurity();
     this.setupMiddleware();
     this.setupRoutes();
     this.setupErrorHandling();
     this.initialize();
   }
 
-  private setupMiddleware(): void {
-    this.app.use(helmet({
-      contentSecurityPolicy: false,
-    }));
+  private setupSecurity(): void {
+    // Rate limiting
+    if (config.security.enableRateLimiting) {
+      const limiter = rateLimit({
+        windowMs: config.security.rateLimitWindowMs,
+        max: config.security.rateLimitMaxRequests,
+        message: {
+          success: false,
+          error: 'Too many requests from this IP, please try again later.'
+        },
+        standardHeaders: true,
+        legacyHeaders: false,
+      });
+      this.app.use(limiter);
+    }
 
+    // Helmet for security headers
+    this.app.use(helmet({
+      contentSecurityPolicy: {
+        directives: {
+          defaultSrc: ["'self'"],
+          styleSrc: ["'self'", "'unsafe-inline'"],
+          scriptSrc: ["'self'"],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: ["'self'", "https:"],
+        },
+      },
+      hsts: {
+        maxAge: 31536000,
+        includeSubDomains: true,
+        preload: true,
+      },
+      hidePoweredBy: true,
+    }));
+  }
+
+  private setupMiddleware(): void {
     this.app.use(cors({
       origin: process.env.CORS_ORIGIN,
       methods: ['GET', 'POST'],
@@ -69,7 +103,8 @@ export class Application {
       tempDir: config.paths.tempDir,
       uploadDir: config.paths.uploadDir,
       apiKeys: config.api.openrouter.keys.length,
-      supportedLanguages: config.translation.supportedLanguages.length
+      supportedLanguages: config.translation.supportedLanguages.length,
+      rateLimiting: config.security.enableRateLimiting
     });
   }
 
