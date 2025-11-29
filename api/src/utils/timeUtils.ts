@@ -12,3 +12,7 @@ export const formatDuration = (ms: number): string => {
   if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
   return `${seconds}s`;
 };
+
+export const delay = (ms: number): Promise<void> => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
