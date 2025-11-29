@@ -3,11 +3,47 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { TranslationError } from '../../utils/errorUtils';
-import { TranslationOptions, TranslationResult, ErrorCode } from '../../utils/types';
+import { TranslationOptions, TranslationResult, ErrorCode, TranslationRequest, TranslationResponse } from '../../utils/types';
 
 const execAsync = promisify(exec);
 
 export class LocalTranslationService {
+  async translate(request: TranslationRequest): Promise<TranslationResponse> {
+    // For local translation, we'll implement a basic key-value mapping based on language patterns
+    const startTime = Date.now();
+    const translations: Record<string, string> = {};
+    const errors: any[] = [];
+
+    // For local translation, we'll use simple rules or return the same text
+    // This is a basic implementation - in real scenarios, this would use local dictionaries
+    for (const key of request.keys) {
+      try {
+        const originalText = request.texts[key];
+        // Basic translation logic - in reality this would use local dictionaries
+        translations[key] = this.localTranslateText(originalText, request.sourceLang, request.targetLang);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+
+    return {
+      translations,
+      metadata: {
+        provider: 'local',
+        processingTime: Date.now() - startTime,
+        successfulKeys: Object.keys(translations).length,
+        failedKeys: errors.length
+      },
+      errors
+    };
+  }
+
+  private localTranslateText(text: string, sourceLang: string, targetLang: string): string {
+    // Basic implementation - in reality this would use local dictionaries or translation rules
+    // For now, just return the original text (no-op translation)
+    return text;
+  }
+
   async translateJsonFile(filePath: string, options: TranslationOptions): Promise<TranslationResult> {
     try {
       const command = `jsontt ${filePath} --fallback ${options.fb} --concurrencylimit ${options.cl} --module ${options.m} --from ${options.f} --to ${options.t} --name ru`;

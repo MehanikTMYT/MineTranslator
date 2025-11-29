@@ -184,7 +184,7 @@ export class OllamaService {
           model: this.model,
           processingTime: duration,
           tokensUsed: this.estimateTokens(prompt),
-          successfulKeys: translationResult.successfulTranslations?.length || 0,
+          successfulKeys: translationResult.successfulTranslations ? Object.keys(translationResult.successfulTranslations).length : 0,
           failedKeys: translationResult.failedTranslations?.length || 0,
           fallbackUsed: false
         },
@@ -302,6 +302,7 @@ Return ONLY the JSON object with translations:`;
       }
 
       return {
+        success: Object.keys(successfulTranslations).length > 0,
         successfulTranslations,
         failedTranslations
       };
@@ -388,7 +389,11 @@ Return ONLY the JSON object with translations:`;
         successCount: Object.keys(successfulTranslations).length,
         errorCount: failedTranslations.length
       });
-      return { successfulTranslations, failedTranslations };
+      return { 
+        success: Object.keys(successfulTranslations).length > 0, 
+        successfulTranslations, 
+        failedTranslations 
+      };
     }
 
     throw new TranslationError('Fallback parsing also failed to extract translations');

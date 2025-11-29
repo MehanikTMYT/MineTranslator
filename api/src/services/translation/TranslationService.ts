@@ -29,7 +29,7 @@ export class TranslationService {
   constructor() {
     this.localService = new LocalTranslationService();
     this.apiKeyManager = new ApiKeyManager();
-    this.aiService = new AiTranslationService(this.apiKeyManager);
+    this.aiService = new AiTranslationService();
     this.translationCache = new Map();
     this.cacheSize = 10000; // Максимальный размер кэша
     logger.info('Intialized TranslationService');
@@ -236,17 +236,14 @@ export class TranslationService {
         if (method === methods[methods.length - 1]) {
           throw new TranslationError(
             `All translation methods failed. Last error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            { 
-              errors: errors.map(e => e instanceof Error ? e.message : String(e)),
-              methods
-            }
+            'TRANSLATION_FAILED'
           );
         }
       }
     }
 
     // Если ни один метод не вернул результат
-    throw new TranslationError('No translations were produced by any method', { methods, errorCount: errors.length });
+    throw new TranslationError('No translations were produced by any method', 'TRANSLATION_FAILED');
   }
 
   /**
@@ -265,7 +262,9 @@ export class TranslationService {
         // Проверяем размер кэша и чистим при необходимости
         if (this.translationCache.size >= this.cacheSize) {
           const oldestKey = this.translationCache.keys().next().value;
-          this.translationCache.delete(oldestKey);
+          if (oldestKey) {
+            this.translationCache.delete(oldestKey);
+          }
         }
         
         this.translationCache.set(cacheKey, value);
