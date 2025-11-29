@@ -1,7 +1,37 @@
 ```
-# Examples and documentation
-IMPLEMENTATION_SUMMARY.md
-IMPROVED_SERVICE_EXAMPLE.ts
-README_REFACTORING.md
-REFACTORING_PLAN.md
+# Dependencies
+node_modules/
+
+# Compiled and build artifacts
+dist/
+build/
+*.js.map
+*.tsbuildinfo
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
+
+# Python artifacts (if any Python files exist in the project)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Coverage reports
+coverage/
+htmlcov/
+
+# OS generated files
+.DS_Store
+Thumbs.db
 ```

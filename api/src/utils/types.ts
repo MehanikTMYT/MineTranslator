@@ -10,6 +10,16 @@ export interface TranslationOptions {
   fileType?: 'json' | 'lang';
 }
 
+export interface SecurityConfig {
+  allowedFileExtensions: string[];
+  maxUploadFiles: number;
+  enableRateLimiting: boolean;
+  rateLimitWindowMs: number;
+  rateLimitMaxRequests: number;
+  enablePathValidation: boolean;
+  enableFileValidation: boolean;
+}
+
 export interface ApiLimits {
   rate_limit: {
     requests: number;
@@ -111,6 +121,7 @@ export interface AppConfig {
     maxRetriesPerKey: number;
     maxOllamaRetries: number;
   };
+  security: SecurityConfig;
   batchProcessing: {
     openrouter: {
       maxBatchSize: number;

@@ -38,11 +38,20 @@ export const config: AppConfig = {
     skipEmptyValues: process.env.SKIP_EMPTY_VALUES === 'true',
   },
   limits: {
-    maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '50000000', 10),
+    maxFileSize: parseInt(process.env.MAX_FILE_SIZE || '50000000', 10), // 50MB
     maxConcurrentRequests: parseInt(process.env.MAX_CONCURRENT_REQUESTS || '5', 10),
-    requestTimeout: parseInt(process.env.REQUEST_TIMEOUT || '300000', 10),
+    requestTimeout: parseInt(process.env.REQUEST_TIMEOUT || '300000', 10), // 5 minutes
     maxRetriesPerKey: parseInt(process.env.MAX_RETRIES_PER_KEY || '3', 10),
     maxOllamaRetries: parseInt(process.env.MAX_OLLAMA_RETRIES || '2', 10),
+  },
+  security: {
+    allowedFileExtensions: ['.jar'],
+    maxUploadFiles: 1,
+    enableRateLimiting: process.env.ENABLE_RATE_LIMITING === 'true',
+    rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
+    rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
+    enablePathValidation: true,
+    enableFileValidation: true,
   },
   batchProcessing: {
     openrouter: {

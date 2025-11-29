@@ -44,7 +44,7 @@ export class PackParserService {
     const metadataList: ModMetadata[] = [];
     
     const metaInfDir = path.join(rootDir, 'META-INF');
-    if (fs.existsSync(metaInfDir) && fs.statSync(metaInfDir).isDirectory()) {
+    if (await this.isDirectory(metaInfDir)) {
       console.log(`🔍 Searching for mod metadata in META-INF: ${metaInfDir}`);
       const metaInfMetadata = await this.tomlParserService.findModMetadataInDirectory(metaInfDir);
       metadataList.push(...metaInfMetadata);
@@ -55,13 +55,22 @@ export class PackParserService {
     metadataList.push(...rootMetadata);
     
     const modsDir = path.join(rootDir, 'mods');
-    if (fs.existsSync(modsDir) && fs.statSync(modsDir).isDirectory()) {
+    if (await this.isDirectory(modsDir)) {
       console.log(`🔍 Searching for mod metadata in mods directory: ${modsDir}`);
       const modsMetadata = await this.tomlParserService.findModMetadataInDirectory(modsDir);
       metadataList.push(...modsMetadata);
     }
     
     return metadataList;
+  }
+
+  private async isDirectory(dirPath: string): Promise<boolean> {
+    try {
+      const stat = await fs.promises.stat(dirPath);
+      return stat.isDirectory();
+    } catch {
+      return false;
+    }
   }
 
   private formatModDescription(metadata: ModMetadata): string {

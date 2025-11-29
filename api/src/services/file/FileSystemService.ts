@@ -3,16 +3,24 @@ import fs from 'fs';
 import path from 'path';
 import AdmZip from 'adm-zip';
 import { LangDirectoryInfo } from '../../utils/types';
+import { AppError } from '../../utils/errorUtils';
+import { ErrorCode } from '../../utils/types';
 
 export class FileSystemService {
-  static safeDelete(targetPath: string, isDirectory: boolean = false): boolean {
+  static async safeDelete(targetPath: string, isDirectory: boolean = false): Promise<boolean> {
     try {
-      if (isDirectory) {
-        fs.rmSync(targetPath, { recursive: true, force: true });
-      } else {
-        fs.unlinkSync(targetPath);
+      // Sanitize path to prevent directory traversal
+      const normalizedPath = path.normalize(targetPath);
+      if (normalizedPath.includes('..')) {
+        throw new AppError('Invalid path: contains directory traversal', ErrorCode.VALIDATION_ERROR, 400);
       }
-      console.log(`🗑️ Deleted: ${targetPath}`);
+
+      if (isDirectory) {
+        await fs.promises.rm(normalizedPath, { recursive: true, force: true });
+      } else {
+        await fs.promises.unlink(normalizedPath);
+      }
+      console.log(`🗑️ Deleted: ${normalizedPath}`);
       return true;
     } catch (err: any) {
       if (err.code === 'ENOENT') {
@@ -25,98 +33,107 @@ export class FileSystemService {
   }
 
   static async validateAndCleanJson(filePath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      fs.readFile(filePath, 'utf8', (err, data) => {
-        if (err) {
-          return reject(new Error(`Error reading file: ${err.message}`));
-        }
+    // Sanitize path to prevent directory traversal
+    const normalizedPath = path.normalize(filePath);
+    if (normalizedPath.includes('..')) {
+      throw new AppError('Invalid path: contains directory traversal', ErrorCode.VALIDATION_ERROR, 400);
+    }
 
-        try {
-          const cleanedData = data.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '').trim();
-          JSON.parse(cleanedData);
-          
-          fs.writeFile(filePath, cleanedData, 'utf8', (writeErr) => {
-            if (writeErr) {
-              return reject(new Error(`Error writing file: ${writeErr.message}`));
-            }
-            console.log(`✅ JSON validated and cleaned: ${filePath}`);
-            resolve();
-          });
-        } catch (parseErr: any) {
-          reject(new Error(`Invalid JSON format in ${filePath}: ${parseErr.message}`));
-        }
-      });
-    });
+    const data = await fs.promises.readFile(normalizedPath, 'utf8');
+    const cleanedData = data.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '').trim();
+
+    try {
+      JSON.parse(cleanedData);
+      await fs.promises.writeFile(normalizedPath, cleanedData, 'utf8');
+      console.log(`✅ JSON validated and cleaned: ${normalizedPath}`);
+    } catch (parseErr: any) {
+      throw new AppError(`Invalid JSON format in ${normalizedPath}: ${parseErr.message}`, ErrorCode.INVALID_JSON, 400);
+    }
   }
 
-  static findLangDirectories(dir: string): LangDirectoryInfo[] {
+  static async findLangDirectories(dir: string): Promise<LangDirectoryInfo[]> {
+    // Sanitize path to prevent directory traversal
+    const normalizedDir = path.normalize(dir);
+    if (normalizedDir.includes('..')) {
+      throw new AppError('Invalid path: contains directory traversal', ErrorCode.VALIDATION_ERROR, 400);
+    }
+
     const langDirs: LangDirectoryInfo[] = [];
-    const items = fs.readdirSync(dir);
-    
+    const items = await fs.promises.readdir(normalizedDir);
+
     for (const item of items) {
-      const itemPath = path.join(dir, item);
-      const stat = fs.statSync(itemPath);
-      
+      const itemPath = path.join(normalizedDir, item);
+      const stat = await fs.promises.stat(itemPath);
+
       if (stat.isDirectory()) {
         if (item === 'lang') {
           const enUsFile = path.join(itemPath, 'en_us.json');
           const ruRuFile = path.join(itemPath, 'ru_ru.json');
-          
+
           langDirs.push({
             path: itemPath,
-            enUsFile: fs.existsSync(enUsFile) ? enUsFile : undefined,
+            enUsFile: await this.fileExists(enUsFile) ? enUsFile : undefined,
             ruRuFile: ruRuFile,
-            exists: fs.existsSync(enUsFile)
+            exists: await this.fileExists(enUsFile)
           });
         } else {
-          langDirs.push(...this.findLangDirectories(itemPath));
+          const subLangDirs = await this.findLangDirectories(itemPath);
+          langDirs.push(...subLangDirs);
         }
       }
     }
-    
+
     return langDirs;
   }
 
+  private static async fileExists(filePath: string): Promise<boolean> {
+    try {
+      await fs.promises.access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   static async createJar(sourceDir: string, outPath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      try {
-        const zip = new AdmZip();
-        
-        function addFilesToZip(dir: string, baseDir: string): void {
-          const files = fs.readdirSync(dir);
-          for (const file of files) {
-            const filePath = path.join(dir, file);
-            const relativePath = path.relative(baseDir, filePath);
-            const stat = fs.statSync(filePath);
-            
-            if (stat.isDirectory()) {
-              addFilesToZip(filePath, baseDir);
-            } else {
-              zip.addLocalFile(filePath, path.dirname(relativePath));
-              console.log(`📦 Added to JAR: ${relativePath}`);
-            }
-          }
+    // Sanitize paths to prevent directory traversal
+    const normalizedSourceDir = path.normalize(sourceDir);
+    const normalizedOutPath = path.normalize(outPath);
+
+    if (normalizedSourceDir.includes('..') || normalizedOutPath.includes('..')) {
+      throw new AppError('Invalid path: contains directory traversal', ErrorCode.VALIDATION_ERROR, 400);
+    }
+
+    const zip = new AdmZip();
+
+    const addFilesToZip = async (dir: string, baseDir: string): Promise<void> => {
+      const files = await fs.promises.readdir(dir);
+      for (const file of files) {
+        const filePath = path.join(dir, file);
+        const stat = await fs.promises.stat(filePath);
+
+        if (stat.isDirectory()) {
+          await addFilesToZip(filePath, baseDir);
+        } else {
+          const relativePath = path.relative(baseDir, filePath);
+          zip.addLocalFile(filePath, path.dirname(relativePath));
+          console.log(`📦 Added to JAR: ${relativePath}`);
         }
-        
-        addFilesToZip(sourceDir, sourceDir);
-        zip.writeZip(outPath);
-        console.log(`✅ JAR archive created: ${outPath}`);
-        resolve();
-      } catch (error: any) {
-        reject(new Error(`Failed to create JAR archive: ${error.message}`));
       }
-    });
+    };
+
+    await addFilesToZip(normalizedSourceDir, normalizedSourceDir);
+    zip.writeZip(normalizedOutPath);
+    console.log(`✅ JAR archive created: ${normalizedOutPath}`);
   }
 
   static async ensureDirectoryExists(dirPath: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      fs.mkdir(dirPath, { recursive: true }, (err) => {
-        if (err) {
-          reject(new Error(`Failed to create directory ${dirPath}: ${err.message}`));
-        } else {
-          resolve();
-        }
-      });
-    });
+    // Sanitize path to prevent directory traversal
+    const normalizedPath = path.normalize(dirPath);
+    if (normalizedPath.includes('..')) {
+      throw new AppError('Invalid path: contains directory traversal', ErrorCode.VALIDATION_ERROR, 400);
+    }
+
+    await fs.promises.mkdir(normalizedPath, { recursive: true });
   }
 }
