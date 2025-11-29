@@ -1,8 +1,8 @@
 // src/services/ai/AiTranslationService.ts
 import { OpenAIService } from './OpenAIService';
 import { sleep } from '../../utils/timeUtils';
-import { TranslationError } from '../../utils/errorUtils';
-import { TranslationOptions, TranslationResult, ErrorCode } from '../../utils/types';
+import { TranslationError, ServiceUnavailableError } from '../../utils/errorUtils';
+import { TranslationOptions, TranslationResult, ErrorCode, TranslationRequest, TranslationResponse } from '../../utils/types';
 import { config } from '../../config/config';
 
 export class AiTranslationService {
@@ -11,6 +11,53 @@ export class AiTranslationService {
 
   constructor() {
     this.openaiService = new OpenAIService();
+  }
+
+  async checkHealth(): Promise<boolean> {
+    try {
+      // Try to make a simple API call to check if the service is working
+      await this.openaiService.checkApiLimits();
+      return true;
+    } catch (error) {
+      throw new ServiceUnavailableError(`AI service health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async translate(request: TranslationRequest): Promise<TranslationResponse> {
+    // Implement the translation method for AI service
+    // For now, return a placeholder implementation
+    const startTime = Date.now();
+    const translations: Record<string, string> = {};
+    const errors: any[] = [];
+
+    for (const key of request.keys) {
+      try {
+        // Translate each text using the existing translateText method
+        const translatedText = await this.translateText(request.texts[key], {
+          fb: 'yes',
+          cl: 1,
+          m: 'google',
+          f: request.sourceLang,
+          t: request.targetLang,
+          translateMethod: 'ai',
+          aiProvider: 'openrouter'
+        });
+        translations[key] = translatedText;
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+
+    return {
+      translations,
+      metadata: {
+        provider: 'ai',
+        processingTime: Date.now() - startTime,
+        successfulKeys: Object.keys(translations).length,
+        failedKeys: errors.length
+      },
+      errors
+    };
   }
 
   async translateText(text: string, options: TranslationOptions, descriptions: string[] = []): Promise<string> {
