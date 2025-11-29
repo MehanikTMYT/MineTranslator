@@ -11,6 +11,12 @@ __pycache__/
 *.out
 
 # Dependencies
+
+# Compiled and build artifacts
+dist/
+build/
+*.js.map
+*.tsbuildinfo
 node_modules/
 venv/
 .venv/
