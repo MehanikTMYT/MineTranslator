@@ -1,0 +1,78 @@
+{
+  "name": "minecraft-mod-translator",
+  "version": "3.5.0",
+  "description": "Advanced Minecraft mod translator with AI and local translation support",
+  "main": "dist/server.js",
+  "type": "commonjs",
+  "packageManager": "pnpm@8.15.6",
+
+  "scripts": {
+    "build": "tsc && tsc-alias",
+    "start": "node dist/server.js",
+    "dev": "nodemon --exec ts-node src/server.ts",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "clean": "rm -rf dist node_modules .pnpm-lock.yaml .pnpm-debug.log*",
+    "reinstall": "pnpm run clean && pnpm install",
+    "reinstall-build": "pnpm run clean && pnpm install && pnpm run build",
+    "reinstall-start": "pnpm run reinstall-build && pnpm run start"
+  },
+
+  "dependencies": {
+    "@iarna/toml": "^2.2.5",
+    "adm-zip": "^0.5.16",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "morgan": "^1.10.1",
+    "multer": "^2.0.2",
+    "node-fetch": "^3.3.2",
+    "openai": "^6.9.1"
+  },
+
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/adm-zip": "^0.5.7",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/morgan": "^1.9.10",
+    "@types/multer": "^2.0.0",
+    "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.0",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "husky": "9.1.7",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.11",
+    "prettier": "^3.7.2",
+    "ts-jest": "^29.4.5",
+    "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.48.0"
+  },
+
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+
+  "pnpm": {
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "eslint",
+        "typescript",
+        "jest",
+        "prettier"
+      ]
+    },
+    "overrides": {
+      "glob": "^10.5.0",
+      "inflight": "^1.0.6"
+    }
+  }
+}
