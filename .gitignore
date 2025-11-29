@@ -1,4 +1,15 @@
 ```
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+*.o
+*.obj
+*.class
+*.dll
+*.so
+*.a
+*.out
+
 # Dependencies
 
 # Compiled and build artifacts
@@ -6,26 +17,65 @@ dist/
 build/
 *.js.map
 *.tsbuildinfo
+node_modules/
+venv/
+.venv/
+.env
+.env.local
+*.env.*
 
 # Logs and temp files
 *.log
 *.tmp
+*.swp
+*.swo
 
 # Editors
 .vscode/
 .idea/
 
-# Python artifacts (if any Python files exist in the project)
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Build directories
+dist/
+build/
+target/
+coverage/
+htmlcov/
+.mypy_cache/
+.pytest_cache/
+.gradle/
 
-# Coverage reports
+# System files
+.DS_Store
+Thumbs.db
+```
+
+Wait, I need to reconsider this. The modified files are TypeScript files (.ts), not Python files. Let me correct the .gitignore:
+
+```
+# Dependencies
+node_modules/
+.env
+.env.local
+*.env.*
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Editors
+.vscode/
+.idea/
+
+# Build directories
+dist/
+build/
+target/
 coverage/
 htmlcov/
 
-# OS generated files
+# System files
 .DS_Store
 Thumbs.db
 ```

@@ -1,9 +1,9 @@
 import fetch from 'node-fetch';
 import { config } from '../../config/config';
-import { TranslationRequest, TranslationResponse, TranslationError, TranslationResult } from '../../utils/types';
+import { TranslationRequest, TranslationResponse, TranslationResult } from '../../utils/types';
 import { logger } from '../../utils/logger';
 import { ApiKeyManager } from './ApiKeyManager';
-import { ServiceUnavailableError, TranslationTimeoutError, ModelNotFoundError } from '../../utils/errorUtils';
+import { ServiceUnavailableError, TranslationTimeoutError, ModelNotFoundError, TranslationError } from '../../utils/errorUtils';
 import { delay } from '../../utils/timeUtils';
 
 /**
@@ -51,19 +51,24 @@ export class OllamaService {
   public async checkHealth(): Promise<boolean> {
     try {
       // Проверка доступности сервера
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), this.healthCheckTimeout);
+      
       const serverResponse = await fetch(`${this.baseUrl.replace('/api/generate', '/api/tags')}`, {
         method: 'GET',
-        timeout: this.healthCheckTimeout,
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
 
       if (!serverResponse.ok) {
         throw new ServiceUnavailableError(`Ollama server unavailable: ${serverResponse.status} ${serverResponse.statusText}`);
       }
 
-      const data = await serverResponse.json();
+      const data = await serverResponse.json() as any;
       
       // Проверка наличия модели
-      const models = data.models || [];
+      const models = Array.isArray(data.models) ? data.models : [];
       const modelAvailable = models.some((model: any) => 
         model.name === this.model || model.name.includes(this.model)
       );
@@ -168,22 +173,22 @@ export class OllamaService {
       const duration = Date.now() - startTime;
       logger.info('Ollama translation completed', { 
         duration: `${duration}ms`, 
-        successCount: translationResult.successfulTranslations.length,
-        errorCount: translationResult.failedTranslations.length
+        successCount: translationResult.successfulTranslations?.length || 0,
+        errorCount: translationResult.failedTranslations?.length || 0
       });
 
       return {
-        translations: translationResult.successfulTranslations,
+        translations: translationResult.successfulTranslations || {},
         metadata: {
           provider: 'ollama',
           model: this.model,
           processingTime: duration,
           tokensUsed: this.estimateTokens(prompt),
-          successfulKeys: translationResult.successfulTranslations.length,
-          failedKeys: translationResult.failedTranslations.length,
+          successfulKeys: translationResult.successfulTranslations ? Object.keys(translationResult.successfulTranslations).length : 0,
+          failedKeys: translationResult.failedTranslations?.length || 0,
           fallbackUsed: false
         },
-        errors: translationResult.failedTranslations
+        errors: translationResult.failedTranslations || []
       };
 
     } catch (error) {
@@ -297,6 +302,7 @@ Return ONLY the JSON object with translations:`;
       }
 
       return {
+        success: Object.keys(successfulTranslations).length > 0,
         successfulTranslations,
         failedTranslations
       };
@@ -383,7 +389,11 @@ Return ONLY the JSON object with translations:`;
         successCount: Object.keys(successfulTranslations).length,
         errorCount: failedTranslations.length
       });
-      return { successfulTranslations, failedTranslations };
+      return { 
+        success: Object.keys(successfulTranslations).length > 0, 
+        successfulTranslations, 
+        failedTranslations 
+      };
     }
 
     throw new TranslationError('Fallback parsing also failed to extract translations');

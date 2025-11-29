@@ -49,6 +49,42 @@ export class ApiError extends AppError {
   }
 }
 
+export class ServiceUnavailableError extends AppError {
+  constructor(message: string, details: Record<string, any> = {}) {
+    super(message, ErrorCode.API_ERROR, 503, details);
+  }
+}
+
+export class TranslationTimeoutError extends AppError {
+  constructor(message: string, details: Record<string, any> = {}) {
+    super(message, ErrorCode.API_ERROR, 408, details);
+  }
+}
+
+export class ModelNotFoundError extends AppError {
+  constructor(message: string, details: Record<string, any> = {}) {
+    super(message, ErrorCode.API_ERROR, 404, details);
+  }
+}
+
+export class UnsupportedLanguageError extends AppError {
+  constructor(message: string, details: Record<string, any> = {}) {
+    super(message, ErrorCode.VALIDATION_ERROR, 400, details);
+  }
+}
+
+export class FileSizeLimitError extends AppError {
+  constructor(message: string, details: Record<string, any> = {}) {
+    super(message, ErrorCode.VALIDATION_ERROR, 413, details);
+  }
+}
+
+export class InvalidFileError extends AppError {
+  constructor(message: string, details: Record<string, any> = {}) {
+    super(message, ErrorCode.VALIDATION_ERROR, 400, details);
+  }
+}
+
 export const errorHandler = (
   err: Error | AppError,
   _: Request,

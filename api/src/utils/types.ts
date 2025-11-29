@@ -10,6 +10,36 @@ export interface TranslationOptions {
   fileType?: 'json' | 'lang';
 }
 
+export interface TranslationRequest {
+  sourceLang: string;
+  targetLang: string;
+  keys: string[];
+  texts: Record<string, string>;
+  methods?: ('local' | 'ai')[];
+  modules?: ('google' | 'google2' | 'bing')[];
+  fallbackOptions?: ('yes' | 'no')[];
+}
+
+export interface TranslationResponse {
+  translations: Record<string, string>;
+  metadata: {
+    provider: string;
+    model?: string;
+    processingTime: number;
+    tokensUsed?: number;
+    successfulKeys: number;
+    failedKeys: number;
+    fallbackUsed?: boolean;
+    cacheHits?: number;
+    cacheMisses?: number;
+  };
+  errors: any[];
+}
+
+export type TranslationMethod = 'local' | 'ai';
+export type TranslationModule = 'google' | 'google2' | 'bing';
+export type SupportedLanguage = string;
+
 export interface SecurityConfig {
   allowedFileExtensions: string[];
   maxUploadFiles: number;
@@ -38,6 +68,8 @@ export interface TranslationResult {
   error?: string;
   filePath?: string;
   fileType?: 'json' | 'lang';
+  successfulTranslations?: Record<string, string>;
+  failedTranslations?: any[];
 }
 
 export interface JarProcessingResult {
