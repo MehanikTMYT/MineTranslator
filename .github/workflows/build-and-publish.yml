@@ -75,7 +75,7 @@ jobs:
         GHCR_REPOSITORY: ${{ github.repository }}
       run: |
         # Безопасный вход в Docker registry
-        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        echo "${{ secrets.CR_PAT}}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
         
         cd api
         # Используем путь к репозиторию и преобразуем в нижний регистр
