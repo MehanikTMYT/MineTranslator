@@ -87,7 +87,7 @@ def parse_arguments():
                         help='Детальное логирование (DEBUG уровень)')
     
     # Сервер
-    parser.add_argument('--server_url', type=str, default='http://mehhost.ru:8250/process',
+    parser.add_argument('--server_url', type=str, default='http://localhost:8250',
                         help='URL API сервера')
     
     return parser.parse_args()

@@ -72,7 +72,7 @@ python run_gui.py
 | `--recursive` | Рекурсивный поиск | False |
 | `--dry_run` | Тестовый режим | False |
 | `--skip_health_check` | Пропустить проверку сервера | False |
-| `--server_url` | URL API сервера | http://mehhost.ru:8250/process |
+| `--server_url` | URL API сервера | http://localhost:8250 |
 
 ## Функциональность GUI
 

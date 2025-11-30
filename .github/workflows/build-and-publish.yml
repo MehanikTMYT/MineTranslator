@@ -1,0 +1,78 @@
+name: Build and Publish
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        role: [client, server]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      if: matrix.role == 'server'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Set up Python
+      if: matrix.role == 'client'
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies for server
+      if: matrix.role == 'server'
+      run: |
+        cd api
+        npm install -g pnpm
+        pnpm install
+
+    - name: Install dependencies for client
+      if: matrix.role == 'client'
+      run: |
+        cd client
+        pip install -r requirements.txt
+
+    - name: Build server
+      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      run: |
+        cd api
+        pnpm build
+
+    - name: Build client
+      if: matrix.role == 'client'
+      run: |
+        cd client
+        pip install pyinstaller
+        pyinstaller --onefile main.py -n translator-client-${{ runner.os }}
+
+    - name: Upload client artifacts
+      if: matrix.role == 'client'
+      uses: actions/upload-artifact@v3
+      with:
+        name: translator-client-${{ matrix.os }}
+        path: client/dist/translator-client-${{ runner.os }}
+
+    - name: Upload server artifacts
+      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      uses: actions/upload-artifact@v3
+      with:
+        name: translator-server-${{ matrix.os }}
+        path: api/dist/
+
+    - name: Build and push Docker image
+      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      run: |
+        docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+        cd api
+        docker build -t ghcr.io/${{ github.repository_owner }}/translator-service:latest .
+        docker push ghcr.io/${{ github.repository_owner }}/translator-service:latest

@@ -30,7 +30,7 @@ class TranslatorGUI:
         self.output_dir = tk.StringVar(value="1")
         self.invalid_dir = tk.StringVar(value="2")
         self.corrupted_dir = tk.StringVar(value="3")
-        self.server_url = tk.StringVar(value="http://mehhost.ru:8250/process")
+        self.server_url = tk.StringVar(value="http://localhost:8250")
         self.ai_provider = tk.StringVar(value="openrouter")
         self.source_lang = tk.StringVar(value="en")
         self.target_lang = tk.StringVar(value="ru")
