@@ -26,17 +26,13 @@ jobs:
         node-version: '18'
         cache: 'pnpm'
         cache-dependency-path: api/pnpm-lock.yaml
-        # Явно указываем, что используем pnpm
-        registry-url: 'https://registry.npmjs.org'
 
     - name: Install pnpm
       if: matrix.role == 'server'
-      run: |
-        corepack enable
-        corepack prepare pnpm@9.0.0 --activate
-        npm install -g pnpm@9.0.0
-        pnpm --version
-      shell: bash
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9.0.0
+        run_install: false
 
     - name: Set up Python
       if: matrix.role == 'client'
@@ -68,6 +64,7 @@ jobs:
 
     - name: Build client
       if: matrix.role == 'client'
+      shell: bash
       run: |
         cd client
         pip install pyinstaller==6.10.0
@@ -84,17 +81,16 @@ jobs:
         fi
         
         echo "Built client executable: $OUTPUT_NAME"
-      shell: bash
 
     - name: List dist directory
       if: matrix.role == 'client'
+      shell: bash
       run: |
         cd client/dist
         ls -la
         echo "::group::File details"
         file *
         echo "::endgroup::"
-      shell: bash
 
     - name: Upload client artifacts
       if: matrix.role == 'client'
@@ -102,7 +98,7 @@ jobs:
       with:
         name: translator-client-${{ matrix.os }}
         path: |
-          client/dist/${{ matrix.os == 'windows-latest' && 'translator-client-Windows.exe' || (matrix.os == 'macos-latest' && 'translator-client-Darwin' || 'translator-client-Linux') }}
+          ${{ matrix.os == 'windows-latest' && 'client/dist/translator-client-Windows.exe' || (matrix.os == 'macos-latest' && 'client/dist/translator-client-Darwin' || 'client/dist/translator-client-Linux') }}
 
     - name: Upload server artifacts
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
@@ -114,9 +110,6 @@ jobs:
     - name: Set up Docker Buildx
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
       uses: docker/setup-buildx-action@v3
-      with:
-        driver: docker-container
-        driver-opts: image=moby/buildkit:master
 
     - name: Log in to GitHub Container Registry
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest' && github.ref == 'refs/heads/main'
