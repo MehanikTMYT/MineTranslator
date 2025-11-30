@@ -1,56 +1,95 @@
-### JAR Translator
+# Translator Service
 
 [Russian version](README-ru.md)
 
-This client application allows you to process JAR files by translating the content from one language to another using various translators via the jsontt module [Thanks to](https://github.com/mololab/json-translator)
+This project provides a translation service with both server and client components. The server handles translation requests, while the client provides both GUI and command-line interfaces to interact with the service. The application supports translation of various file formats including JAR files for Minecraft mods.
+
+## ✨ Features
+
+- Translation between multiple languages
+- Support for various file formats
+- GUI and command-line interfaces
+- Docker support for easy deployment
+- Cross-platform binary builds via GitHub Actions
+- Configurable via environment variables
+- Automated publishing of releases
 
 ## 🚀 Installation and Setup
 
-### Requirements
-- Python 3.7+
-- pip (Python package manager)
+### Quick Start with Pre-built Binaries
 
-### Installing Dependencies
+Download the appropriate binary for your OS from the [Releases](https://github.com/your-repo/releases) page:
+
+1. Download the binary for your operating system (Windows, macOS, Linux)
+2. Make it executable (on Linux/macOS: `chmod +x translator-client`)
+3. Create a `.env` file based on `.env.example`
+4. Run the application: `./translator-client --help`
+
+### Using Docker
+
+Server:
 ```bash
-# Install main dependencies
-pip install -r requirements.txt
-
-# OR install separately
-pip install requests tqdm
+docker run -d -p 8250:8250 --env-file .env ghcr.io/your-username/translator-service:latest
 ```
 
-**Explanation about tqdm:**
-`tqdm` is a library for displaying progress bars in the console. It's not mandatory, but significantly improves user experience when processing a large number of files by showing real-time progress. If you don't install `tqdm`, the application will work in normal mode without a progress bar, but with all other features intact.
+Client:
+```bash
+docker run -it --env-file .env -v $(pwd)/input:/input -v $(pwd)/output:/output ghcr.io/your-username/translator-client:latest
+```
+
+### From Source
+
+#### Requirements
+- Python 3.7+ (for client)
+- Node.js 18+ (for server)
+- pnpm (for server)
+
+#### Installing Dependencies
+```bash
+# For client
+cd client
+pip install -r requirements.txt
+
+# For server
+cd api
+npm install -g pnpm
+pnpm install
+```
 
 ## 🎛️ Usage
 
 ### Starting the Application
-Navigate to the directory with JAR files and run the command:
 
+The client application can be run in two modes:
+
+#### GUI Mode
 ```bash
-python translator.py [options]
+cd client
+python main.py --gui
+```
+
+#### Command Line Mode
+```bash
+cd client
+python main.py [options]
 ```
 
 ### 🔧 Main Command Line Arguments
 
 | Argument | Default | Description |
 |----------|---------|-------------|
-| `--fb` | `yes` | Use fallback translator on errors (`yes`/`no`) |
-| `--cl` | `3` | Maximum number of translation attempts per key |
-| `--m` | `bing` | Main translation method (`google`, `google2`, `bing`) |
-| `--f` | `en` | Source language (language code) |
-| `--t` | `ru` | Target language (language code) |
-| `--input_dir` | `.` | Directory to search for JAR files |
-| `--output_dir` | `1` | Directory for translated files |
-| `--output_invalid` | `2` | Directory for invalid files |
-| `--output_corrupted` | `3` | Directory for corrupted files |
-| `--threads` | `3` | Number of threads for processing |
-| `--recursive` | - | Recursive search for JAR files |
-| `--skip_existing` | - | Skip files that already exist in output_dir |
-| `--dry_run` | - | Test mode without actual processing |
-| `--log_file` | `translator.log` | File for logging |
-| `--verbose` | - | Detailed logging (DEBUG level) |
-| `--server_url` | `http://mehhost.ru:8150/process` | API server URL |
+| `--server_url` | `http://localhost:8250` | Server API URL |
+| `--input_dir` | `./input` | Directory with files to translate |
+| `--output_dir` | `./output` | Directory for translated files |
+| `--source_lang` | `en` | Source language code |
+| `--target_lang` | `ru` | Target language code |
+| `--supported_languages` | `en,ru,de,fr,es` | Comma-separated list of supported languages |
+| `--timeout` | `30` | Request timeout in seconds |
+| `--retry_count` | `3` | Number of retry attempts |
+| `--polling_interval` | `5` | Polling interval for status checks |
+| `--max_file_size` | `10485760` | Maximum file size in bytes |
+| `--log_level` | `INFO` | Logging level |
+| `--log_file` | `client.log` | Log file path |
 
 ### 🌐 Supported Languages
 
@@ -67,39 +106,34 @@ si, sk, sl, so, es, su, sw, sv, tg, ta, te, th, tr, uk,
 ur, uz, vi, cy, xh, yi, yo, zu
 ```
 
-[Original list](https://github.com/mololab/json-translator/blob/master/docs/LANGUAGES.md)
-
 ### 🎯 Usage Examples
 
 **Basic usage:**
 ```bash
-python translator.py
+python main.py --server_url http://localhost:8250 --source_lang en --target_lang ru
 ```
 
 **Advanced usage with settings:**
 ```bash
-python translator.py \
+python main.py \
+  --server_url http://localhost:8250 \
   --input_dir ./mods \
   --output_dir ./translated \
-  --output_invalid ./invalid \
-  --output_corrupted ./corrupted \
-  --threads 5 \
-  --recursive \
-  --skip_existing \
-  --m google2 \
-  --f en \
-  --t zh-CN
+  --source_lang en \
+  --target_lang zh-CN \
+  --timeout 60 \
+  --retry_count 5
 ```
 
-**Test mode (no actual processing):**
+**Using GUI:**
 ```bash
-python translator.py --dry_run --verbose
+python main.py --gui
 ```
 
 ## ⚙️ Features and Advantages
 
 ### 🔄 Multi-threaded Processing
-The application supports parallel file processing with configurable number of threads (`--threads`). This significantly speeds up processing when handling a large number of JAR files.
+The application supports parallel file processing with configurable number of threads. This significantly speeds up processing when handling a large number of files.
 
 ### 📊 Progress Bar
 When `tqdm` is installed, an interactive progress bar is displayed showing:
@@ -127,99 +161,123 @@ After processing completion, detailed statistics are displayed:
 Before sending to the server, files are checked for:
 - File existence
 - Zero size (empty files)
-- Exceeding maximum size (100MB)
-- Correct extension (.jar)
+- Exceeding maximum size
+- Correct file format
 
 ### 🔄 Automatic Retry Mechanism
 On temporary network or server errors:
-- Automatic retry attempts (up to 3 times)
+- Automatic retry attempts (configurable)
 - Exponential backoff between attempts
 - Different strategies for different error types
 
 ### 🚨 Smart Error Handling
-The system automatically classifies errors and moves files to appropriate directories:
-- **Corrupted files**: files with invalid ZIP/JAR structure
-- **Invalid files**: files without required assets/lang folders
-- **API errors**: server-side problems
+The system automatically classifies errors and handles them appropriately:
+- Network errors with retries
+- Server-side problems with fallback mechanisms
+- File validation errors with appropriate logging
 
 ### 📁 Flexible File System
 - Automatic directory creation when needed
-- Safe file moving with conflict checking
-- Backup of original files when deletion fails
+- Safe file operations with conflict checking
+- Support for various file formats
 
 ### 📝 Advanced Logging
-- Log writing to file (`translator.log` by default)
-- Detailed logging level (`--verbose` for DEBUG)
-- Colorful emojis for better readability
-- Logging of all critical events and errors
+- Log writing to file (configurable)
+- Multiple logging levels
+- Detailed logging of all critical events and errors
 
-## 🛠️ Error Handling
+## 🛠️ Server Setup
 
-When processing JAR files, the following scenarios are possible:
+For advanced users who want to set up their own server, please refer to [README-server.md](README-server.md).
 
-✅ **Successful processing**: The file will be saved in the directory specified with the `--output_dir` argument.
+## 🚀 GitHub Actions and Automated Builds
 
-🧩 **Invalid files**: If the file does not contain the required folders (assets, lang), it will be moved to the `--output_invalid` directory.
+The project includes automated build workflows that:
+- Build binaries for multiple platforms (Windows, macOS, Linux)
+- Create Docker images for both client and server
+- Publish releases automatically
+- Run tests on multiple operating systems
 
-🔧 **Corrupted files**: If the file is corrupted (invalid ZIP structure), it will be moved to the `--output_corrupted` directory.
+To use the automated builds, simply push changes to the `main` branch, and the workflow will automatically build and publish new versions.
 
-⏭️ **Skipped files**: Files that fail validation (too large, empty, wrong extension) will be skipped and logged.
+## 🤝 Contributing
 
-## 📊 Application Output Example
+We welcome contributions to this project! To contribute:
 
-```
-============================================================
-🚀 STARTING MINECRAFT MOD TRANSLATOR CLIENT
-============================================================
-📁 Working directory: /home/user/mods
-🔗 Server URL: http://mehhost.ru:8150/process
-🔍 Found JAR files: 53
-⏭️ Skipped files: 1
-🎯 Starting processing of 52 files...
-⚙️ Processing parameters: {'fb': 'yes', 'cl': 3, 'm': 'bing', 'f': 'en', 't': 'ru'}
-✅ Successfully saved: mod1_translated.jar
-🔧 File corrupted: old_mod.jar - invalid zip file
-🧩 Invalid mod structure: texture_pack.jar - missing folder "assets"
-✅ Successfully saved: mod2_translated.jar
-...
-✅ PROCESSING COMPLETED
-============================================================
-```
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Add tests if applicable
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
-## 🚨 Possible Problems and Solutions
+For more detailed information about contributing and modifying the code, see [ADVANCED-USERS.md](ADVANCED-USERS.md).
 
-### ❌ Problem: "ModuleNotFoundError: No module named 'tqdm'"
-**Solution:** Install the tqdm library:
+## 🐳 Docker Support
+
+### Building Docker Images
+
+Server:
 ```bash
-pip install tqdm
+cd api
+docker build -t translator-service .
 ```
-*The application will work without tqdm, but without a progress bar.*
 
-### ❌ Problem: "ConnectionError" or network issues
-**Solution:**
-- Check server availability
-- Increase request timeouts (in code)
-- Use `--dry_run` flag for testing
+Client:
+```bash
+cd client
+docker build -t translator-client .
+```
 
-### ❌ Problem: Insufficient file writing permissions
-**Solution:**
-- Run the application with administrator privileges
-- Specify directories with write permissions via arguments
+### Running with Docker Compose
 
-### ❌ Problem: Files not moving/deleting
-**Solution:**
-- Check directory access permissions
-- Ensure files are not being used by other processes
-- Use `--skip_existing` flag to avoid conflicts
+Create a `docker-compose.yml` file:
+```yaml
+version: '3.8'
+services:
+  server:
+    image: ghcr.io/your-username/translator-service:latest
+    ports:
+      - "8250:8250"
+    env_file:
+      - .env
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8250
 
-## 💡 Conclusion
+  client:
+    image: ghcr.io/your-username/translator-client:latest
+    volumes:
+      - ./input:/input
+      - ./output:/output
+    env_file:
+      - .env
+    depends_on:
+      - server
+```
 
-This application provides a powerful and flexible tool for bulk translation of Minecraft mods. Thanks to multi-threaded processing, automatic error handling, and detailed statistics, it greatly simplifies working with a large number of JAR files.
+Then run:
+```bash
+docker-compose up -d
+```
 
-**Tips for efficient usage:**
-- Use `--dry_run` to test parameters before actual processing
-- Start with a small number of threads (`--threads 2-3`) for stable operation
-- Always make backup copies of original files before bulk processing
-- Use `--verbose` for detailed debug logging when troubleshooting
+## 📄 Environment Configuration
 
-If you encounter any problems, please check the correctness of command line arguments and ensure all dependencies are properly installed.
+Create a `.env` file based on `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Then modify the values as needed for your setup.
+
+## 🆘 Support
+
+If you encounter any problems:
+
+1. Check this documentation
+2. Look through existing [Issues](https://github.com/your-repo/issues)
+3. Create a new issue with detailed information about your problem
+
+For advanced users who want to modify the code, see [ADVANCED-USERS.md](ADVANCED-USERS.md).

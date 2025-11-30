@@ -58,7 +58,7 @@ BACKOFF_FACTOR = 0.5
 class TranslationClient:
     """Клиент для перевода JAR-файлов через API сервера"""
     
-    def __init__(self, base_url: str = "http://mehhost.ru:8250/process"):
+    def __init__(self, base_url: str = "http://localhost:8250"):
         self.base_url = base_url
         self.session = self._create_session()
         self.stats = {
