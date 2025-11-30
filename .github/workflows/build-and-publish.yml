@@ -16,7 +16,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Set up Node.js
-      if: matrix.role == 'server'
       uses: actions/setup-node@v4
       with:
         node-version: '18'
@@ -24,7 +23,6 @@ jobs:
         # Cache based on the lock file in the api directory
         cache-dependency-path: api/pnpm-lock.yaml
     - name: Install pnpm
-      if: matrix.role == 'server'
       uses: pnpm/action-setup@v4
       with:
         version: 9.0.0
