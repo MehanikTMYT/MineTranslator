@@ -57,14 +57,14 @@ jobs:
 
     - name: Upload client artifacts
       if: matrix.role == 'client'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: translator-client-${{ matrix.os }}
         path: client/dist/translator-client-${{ runner.os }}
 
     - name: Upload server artifacts
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: translator-server-${{ matrix.os }}
         path: api/dist/
