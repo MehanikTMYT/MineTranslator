@@ -18,6 +18,7 @@ export interface TranslationRequest {
   methods?: ('local' | 'ai')[];
   modules?: ('google' | 'google2' | 'bing')[];
   fallbackOptions?: ('yes' | 'no')[];
+  aiProvider?: string; 
 }
 
 export interface TranslationResponse {

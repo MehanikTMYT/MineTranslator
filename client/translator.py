@@ -8,6 +8,8 @@ Minecraft Mod Translator Client
 - Прогресс-бар и детальное логирование
 - Гибкая настройка параметров обработки
 - Валидация файлов перед отправкой
+- Выбор AI провайдера (OpenRouter или Ollama)
+- Устойчивость к сетевым ошибкам и ошибкам сервера
 """
 
 import requests
@@ -43,6 +45,9 @@ SUPPORTED_LANGUAGES = [
     'ur', 'uz', 'vi', 'cy', 'xh', 'yi', 'yo', 'zu'
 ]
 
+# Поддерживаемые AI провайдеры
+AI_PROVIDERS = ['openrouter', 'ollama']
+
 # Константы
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100 MB
 DEFAULT_THREADS = 3
@@ -53,7 +58,7 @@ BACKOFF_FACTOR = 0.5
 class TranslationClient:
     """Клиент для перевода JAR-файлов через API сервера"""
     
-    def __init__(self, base_url: str = "http://mehhost.ru:8150/process"):
+    def __init__(self, base_url: str = "http://mehhost.ru:8250/process"):
         self.base_url = base_url
         self.session = self._create_session()
         self.stats = {
@@ -61,9 +66,16 @@ class TranslationClient:
             'failed': 0,
             'invalid': 0,
             'corrupted': 0,
-            'skipped': 0
+            'skipped': 0,
+            'connection_errors': 0,
+            'server_errors': 0,
+            'ai_provider': {
+                'openrouter': 0,
+                'ollama': 0
+            }
         }
         self.lock = threading.Lock()
+        self.server_available = True
     
     def _create_session(self) -> requests.Session:
         """Создает сессию с настройками повторных попыток"""
@@ -83,6 +95,38 @@ class TranslationClient:
         
         return session
     
+    def validate_server_connection(self, skip_health_check: bool = False) -> bool:
+        """Проверка доступности сервера перед началом обработки"""
+        if skip_health_check:
+            logging.warning("⚠️ Проверка доступности сервера пропущена (skip_health_check=True)")
+            return True
+            
+        try:
+            # Попытка получить информацию о сервере
+            health_url = self.base_url.replace('/process', '/health')
+            logging.info(f"🔍 Проверка доступности сервера: {health_url}")
+            
+            response = self.session.get(health_url, timeout=10)
+            if response.status_code == 200:
+                logging.info(f"✅ Сервер доступен. Статус: {response.status_code}")
+                try:
+                    server_info = response.json()
+                    logging.info(f"ℹ️ Информация о сервере: {server_info}")
+                except:
+                    logging.info(f"ℹ️ Сервер вернул ответ: {response.text[:100]}...")
+                return True
+            else:
+                logging.warning(f"⚠️ Сервер вернул статус {response.status_code}")
+                # Если сервер вернул 404 на /health, но API может быть доступно
+                if response.status_code == 404:
+                    logging.warning("🔧 Эндпоинт /health не найден, но API может быть доступно. Продолжаем обработку...")
+                    return True
+                return False
+        except Exception as e:
+            logging.error(f"❌ Ошибка при проверке сервера: {e}")
+            logging.warning("⚠️ Не удалось проверить сервер, но продолжаем обработку файлов...")
+            return True  # Продолжаем работу даже при ошибке проверки
+    
     def validate_jar_file(self, file_path: Path) -> Tuple[bool, str]:
         """
         Валидация JAR файла перед отправкой
@@ -90,19 +134,22 @@ class TranslationClient:
         Returns:
             Tuple[bool, str]: (валиден, сообщение об ошибке)
         """
-        if not file_path.exists():
-            return False, f"Файл не существует: {file_path}"
-        
-        if file_path.stat().st_size == 0:
-            return False, f"Файл пустой: {file_path}"
-        
-        if file_path.stat().st_size > MAX_FILE_SIZE:
-            return False, f"Файл слишком большой (> {MAX_FILE_SIZE/1024/1024}MB): {file_path}"
-        
-        if not file_path.name.endswith('.jar'):
-            return False, f"Неверное расширение файла (требуется .jar): {file_path}"
-        
-        return True, ""
+        try:
+            if not file_path.exists():
+                return False, f"Файл не существует: {file_path}"
+            
+            if file_path.stat().st_size == 0:
+                return False, f"Файл пустой: {file_path}"
+            
+            if file_path.stat().st_size > MAX_FILE_SIZE:
+                return False, f"Файл слишком большой (> {MAX_FILE_SIZE/1024/1024}MB): {file_path}"
+            
+            if not file_path.name.endswith('.jar'):
+                return False, f"Неверное расширение файла (требуется .jar): {file_path}"
+            
+            return True, ""
+        except Exception as e:
+            return False, f"Ошибка при валидации файла: {e}"
     
     def move_file(self, source_path: Path, target_dir: Path) -> bool:
         """
@@ -117,52 +164,107 @@ class TranslationClient:
             
             logging.info(f"📁 Перемещение файла: {source_path} -> {target_path}")
             
+            # Проверка существования целевого файла
             if target_path.exists():
-                target_path.unlink()
+                # Создаем уникальное имя, если файл уже существует
+                counter = 1
+                while target_path.exists():
+                    new_name = f"{source_path.stem}_{counter}{source_path.suffix}"
+                    target_path = target_dir / new_name
+                    counter += 1
             
             shutil.move(str(source_path), str(target_path))
+            logging.info(f"✅ Файл успешно перемещен: {target_path}")
             return True
         except Exception as e:
-            logging.error(f"❌ Ошибка при перемещении файла {source_path}: {e}")
+            logging.error(f"❌ Ошибка при перемещении файла {source_path}: {e}", exc_info=True)
             return False
     
     def handle_error(self, exception: Exception, file_path: Path, 
-                    output_invalid: Path, output_corrupted: Path) -> None:
-        """Обработка ошибок при запросе к API"""
+                    output_invalid: Path, output_corrupted: Path) -> str:
+        """Обработка ошибок при запросе к API. Возвращает тип ошибки."""
         error_message = str(exception)
         error_type = "unknown"
         
-        if isinstance(exception, requests.exceptions.RequestException) and hasattr(exception, 'response'):
-            try:
-                response_data = exception.response.json()
-                error_message = response_data.get("error", str(exception))
-            except:
-                error_message = exception.response.text or str(exception)
+        logging.error(f"🚨 Произошла ошибка при обработке {file_path.name}: {error_message}")
         
-        # Анализ типа ошибки
-        error_lower = error_message.lower()
-        
-        if any(keyword in error_lower for keyword in ["поврежд", "corrupted", "invalid zip", "not a zip"]):
-            error_type = "corrupted"
-            self.move_file(file_path, output_corrupted)
-            logging.error(f"🔧 Файл поврежден: {file_path.name} - {error_message}")
-        
-        elif any(keyword in error_lower for keyword in ["отсутствует папка", "no folder", "missing folder", "assets", "lang"]):
-            error_type = "invalid"
-            self.move_file(file_path, output_invalid)
-            logging.error(f"🧩 Неверная структура мода: {file_path.name} - {error_message}")
+        # Проверка типа исключения
+        if isinstance(exception, requests.exceptions.RequestException):
+            if hasattr(exception, 'response') and exception.response is not None:
+                # Обработка ошибок с ответом от сервера
+                response = exception.response
+                
+                try:
+                    # Попытка получить детали ошибки из JSON
+                    if response.headers.get('Content-Type', '').startswith('application/json'):
+                        response_data = response.json()
+                        error_message = response_data.get("error", response_data.get("message", str(exception)))
+                    else:
+                        error_message = response.text or str(exception)
+                except Exception as json_error:
+                    logging.debug(f"Отладка: ошибка при парсинге JSON: {json_error}")
+                    error_message = response.text or str(exception)
+                
+                # Анализ HTTP статуса
+                if 400 <= response.status_code < 500:
+                    # Клиентские ошибки
+                    error_lower = error_message.lower()
+                    if any(keyword in error_lower for keyword in ["поврежд", "corrupted", "invalid zip", "not a zip", "broken archive"]):
+                        error_type = "corrupted"
+                        self.move_file(file_path, output_corrupted)
+                        logging.error(f"🔧 Файл поврежден: {file_path.name} - {error_message}")
+                    
+                    elif any(keyword in error_lower for keyword in ["отсутствует папка", "no folder", "missing folder", "assets", "lang", "resource", "translation"]):
+                        error_type = "invalid"
+                        self.move_file(file_path, output_invalid)
+                        logging.error(f"🧩 Неверная структура мода: {file_path.name} - {error_message}")
+                    
+                    else:
+                        error_type = "client_error"
+                        logging.error(f"⚠️ Ошибка клиента ({response.status_code}): {file_path.name} - {error_message}")
+                
+                elif 500 <= response.status_code < 600:
+                    # Серверные ошибки
+                    error_type = "server_error"
+                    with self.lock:
+                        self.stats['server_errors'] += 1
+                    logging.error(f"🔥 Серверная ошибка ({response.status_code}): {file_path.name} - {error_message}")
+            
+            else:
+                # Обработка сетевых ошибок без ответа
+                if isinstance(exception, requests.exceptions.ConnectionError):
+                    error_type = "connection_error"
+                    error_message = "Ошибка подключения к серверу"
+                elif isinstance(exception, requests.exceptions.Timeout):
+                    error_type = "timeout_error"
+                    error_message = "Таймаут подключения к серверу"
+                elif isinstance(exception, requests.exceptions.RetryError):
+                    error_type = "retry_exceeded"
+                    error_message = "Превышено количество попыток подключения"
+                else:
+                    error_type = "network_error"
+                    error_message = f"Сетевая ошибка: {str(exception)}"
+                
+                logging.error(f"🌐 {error_message}: {file_path.name}")
+                with self.lock:
+                    self.stats['connection_errors'] += 1
+                # При сетевых ошибках не перемещаем файл, чтобы можно было повторить обработку
         
         else:
-            error_type = "api_error"
-            logging.error(f"⚡ Ошибка API: {file_path.name} - {error_message}")
+            # Обработка других типов исключений
+            error_type = "application_error"
+            logging.error(f"🐞 Ошибка приложения: {file_path.name} - {error_message}", exc_info=True)
         
+        # Обновление статистики
         with self.lock:
             if error_type == "corrupted":
                 self.stats['corrupted'] += 1
             elif error_type == "invalid":
                 self.stats['invalid'] += 1
-            else:
+            elif error_type in ["server_error", "client_error", "application_error", "retry_exceeded"]:
                 self.stats['failed'] += 1
+        
+        return error_type
     
     def process_single_file(self, file_path: Path, output_dir: Path, 
                           output_invalid: Path, output_corrupted: Path,
@@ -183,22 +285,45 @@ class TranslationClient:
                 return False
             
             logging.info(f"🚀 Обработка файла: {file_path.name}")
+            logging.info(f"⚙️ Параметры перевода: {params}")
             
             # Чтение файла
             with open(file_path, 'rb') as jar_file:
                 files = {'jarFile': (file_path.name, jar_file, 'application/java-archive')}
                 
                 try:
+                    # Логирование запроса
+                    logging.debug(f"📤 Отправка запроса на {self.base_url} для файла {file_path.name}")
+                    
                     response = self.session.post(
                         self.base_url,
                         files=files,
                         data=params,
                         timeout=REQUEST_TIMEOUT
                     )
+                    
+                    # Логирование ответа
+                    logging.debug(f"📥 Получен ответ: статус {response.status_code}, размер {len(response.content)} байт")
+                    
+                    # Проверка ответа
+                    if response.status_code >= 400:
+                        logging.warning(f"⚠️ Сервер вернул статус {response.status_code} для {file_path.name}")
+                    
                     response.raise_for_status()
                     
-                except requests.exceptions.RequestException as e:
-                    self.handle_error(e, file_path, output_invalid, output_corrupted)
+                    # Проверка содержимого ответа
+                    if not response.content or len(response.content) < 100:
+                        error_msg = "Пустой или слишком маленький ответ от сервера"
+                        logging.error(f"❌ {error_msg} для {file_path.name}")
+                        raise ValueError(error_msg)
+                    
+                except Exception as e:
+                    error_type = self.handle_error(e, file_path, output_invalid, output_corrupted)
+                    
+                    # Если это сетевая ошибка и файл не был перемещен, попробуем вернуть его в очередь
+                    if error_type in ["connection_error", "timeout_error", "retry_exceeded", "network_error"]:
+                        logging.info(f"🔄 Файл {file_path.name} останется в исходной директории для повторной обработки")
+                    
                     return False
             
             # Сохранение результата
@@ -209,6 +334,14 @@ class TranslationClient:
             
             with open(output_file_path, 'wb') as output_file:
                 output_file.write(response.content)
+            
+            # Проверка сохраненного файла
+            if not output_file_path.exists() or output_file_path.stat().st_size < 100:
+                error_msg = "Ошибка при сохранении переведенного файла"
+                logging.error(f"❌ {error_msg} для {file_path.name}")
+                if output_file_path.exists():
+                    output_file_path.unlink()
+                raise Exception(error_msg)
             
             logging.info(f"✅ Успешно сохранен: {output_file_path.name}")
             
@@ -222,8 +355,13 @@ class TranslationClient:
                 backup_dir = output_dir / "original_backups"
                 self.move_file(file_path, backup_dir)
             
+            # Обновление статистики по провайдеру
+            ai_provider = params.get('aiProvider', 'openrouter')
             with self.lock:
                 self.stats['success'] += 1
+                if ai_provider in self.stats['ai_provider']:
+                    self.stats['ai_provider'][ai_provider] += 1
+            
             return True
             
         except Exception as e:
@@ -236,7 +374,8 @@ class TranslationClient:
                      output_invalid: Path, output_corrupted: Path,
                      params: Dict[str, Union[str, int]], 
                      max_threads: int = DEFAULT_THREADS,
-                     dry_run: bool = False) -> None:
+                     dry_run: bool = False,
+                     skip_health_check: bool = False) -> None:
         """
         Многопоточная обработка файлов
         
@@ -248,13 +387,22 @@ class TranslationClient:
             params: Параметры обработки
             max_threads: Максимальное количество потоков
             dry_run: Режим тестирования без реальной обработки
+            skip_health_check: Пропустить проверку доступности сервера
         """
         if not file_paths:
             logging.warning("📁 JAR файлы не найдены")
             return
         
+        # Проверка доступности сервера
+        if not dry_run:
+            self.server_available = self.validate_server_connection(skip_health_check)
+            if not self.server_available:
+                logging.error("❌ Сервер недоступен. Обработка файлов прервана.")
+                return
+        
         if dry_run:
             logging.info("🔍 РЕЖИМ ТЕСТИРОВАНИЯ (dry-run) - реальная обработка отключена")
+            logging.info(f"⚙️ Параметры обработки (тестовый режим): {params}")
             for file_path in file_paths:
                 logging.info(f"📋 Найден файл для обработки: {file_path.name}")
             return
@@ -281,7 +429,7 @@ class TranslationClient:
                     try:
                         future.result()
                     except Exception as e:
-                        logging.error(f"❌ Ошибка при обработке {filename}: {e}")
+                        logging.error(f"❌ Ошибка при обработке {filename}: {e}", exc_info=True)
                     finally:
                         progress_bar.update(1)
                 
@@ -289,30 +437,45 @@ class TranslationClient:
             except ImportError:
                 logging.warning("📦 tqdm не установлен. Установите для отображения прогресс-бара: pip install tqdm")
                 for future, _ in futures:
-                    future.result()
+                    try:
+                        future.result()
+                    except Exception as e:
+                        logging.error(f"❌ Ошибка при обработке файла: {e}", exc_info=True)
         
         # Вывод статистики
         self.print_statistics()
     
     def print_statistics(self) -> None:
         """Вывод статистики обработки"""
-        total = sum(self.stats.values())
-        if total == 0:
+        total_processed = (
+            self.stats['success'] + 
+            self.stats['failed'] + 
+            self.stats['invalid'] + 
+            self.stats['corrupted'] + 
+            self.stats['skipped']
+        )
+        
+        if total_processed == 0:
             return
         
-        success_rate = (self.stats['success'] / total * 100) if total > 0 else 0
+        success_rate = (self.stats['success'] / total_processed * 100) if total_processed > 0 else 0
         
-        logging.info("\n" + "="*50)
+        logging.info("\n" + "="*60)
         logging.info("📊 СТАТИСТИКА ОБРАБОТКИ")
-        logging.info("="*50)
-        logging.info(f"✅ Успешно:       {self.stats['success']}")
-        logging.info(f"❌ Ошибки:        {self.stats['failed']}")
-        logging.info(f"🧩 Невалидные:    {self.stats['invalid']}")
-        logging.info(f"🔧 Поврежденные:  {self.stats['corrupted']}")
-        logging.info(f"⏭️ Пропущено:     {self.stats['skipped']}")
-        logging.info(f"📈 Всего:         {total}")
-        logging.info(f"🎯 Процент успеха: {success_rate:.1f}%")
-        logging.info("="*50)
+        logging.info("="*60)
+        logging.info(f"✅ Успешно:                  {self.stats['success']}")
+        logging.info(f"❌ Ошибки:                   {self.stats['failed']}")
+        logging.info(f"🧩 Невалидные:               {self.stats['invalid']}")
+        logging.info(f"🔧 Поврежденные:             {self.stats['corrupted']}")
+        logging.info(f"⏭️ Пропущено:                {self.stats['skipped']}")
+        logging.info(f"🌐 Сетевые ошибки:           {self.stats['connection_errors']}")
+        logging.info(f"🔥 Серверные ошибки:         {self.stats['server_errors']}")
+        logging.info(f"📈 Всего обработано:         {total_processed}")
+        logging.info(f"🎯 Процент успеха:           {success_rate:.1f}%")
+        logging.info("\n🤖 Статистика по AI провайдерам:")
+        logging.info(f"   • OpenRouter: {self.stats['ai_provider']['openrouter']}")
+        logging.info(f"   • Ollama:     {self.stats['ai_provider']['ollama']}")
+        logging.info("="*60)
 
 def find_jar_files(directory: Path, recursive: bool = False) -> List[Path]:
     """Поиск JAR файлов в директории"""
@@ -324,9 +487,9 @@ def find_jar_files(directory: Path, recursive: bool = False) -> List[Path]:
                 if file.endswith('.jar'):
                     jar_files.append(Path(root) / file)
     else:
-        for file in directory.iterdir():
-            if file.is_file() and file.name.endswith('.jar'):
-                jar_files.append(file)
+        for item in directory.iterdir():
+            if item.is_file() and item.name.endswith('.jar'):
+                jar_files.append(item)
     
     return jar_files
 
@@ -347,6 +510,9 @@ def setup_logging(log_file: Optional[Path] = None, verbose: bool = False) -> Non
         handlers=handlers,
         force=True
     )
+    
+    # Отключаем логирование urllib3 для уменьшения шума
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 def parse_arguments() -> argparse.Namespace:
     """Парсинг аргументов командной строки"""
@@ -367,6 +533,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument('--t', type=str, default='ru', choices=SUPPORTED_LANGUAGES, 
                         help='Целевой язык')
     
+    # AI параметры
+    parser.add_argument('--ai-provider', type=str, default='openrouter', 
+                        choices=AI_PROVIDERS,
+                        help='AI провайдер для перевода: openrouter (облачные модели) или ollama (локальные модели)')
+    
     # Пути и директории
     parser.add_argument('--input_dir', type=str, default='.', 
                         help='Директория для поиска JAR файлов')
@@ -386,6 +557,8 @@ def parse_arguments() -> argparse.Namespace:
                         help='Пропускать файлы, которые уже существуют в output_dir')
     parser.add_argument('--dry_run', action='store_true',
                         help='Тестовый режим без реальной обработки файлов')
+    parser.add_argument('--skip_health_check', action='store_true',
+                        help='Пропустить проверку доступности сервера через /health')
     
     # Логирование
     parser.add_argument('--log_file', type=str, default='translator.log',
@@ -394,7 +567,7 @@ def parse_arguments() -> argparse.Namespace:
                         help='Детальное логирование (DEBUG уровень)')
     
     # Сервер
-    parser.add_argument('--server_url', type=str, default='http://mehhost.ru:8150/process',
+    parser.add_argument('--server_url', type=str, default='http://mehhost.ru:8250/process',
                         help='URL API сервера')
     
     return parser.parse_args()
@@ -418,6 +591,10 @@ def main() -> None:
     logging.info("="*60)
     logging.info(f"📁 Рабочая директория: {input_dir}")
     logging.info(f"🔗 URL сервера: {args.server_url}")
+    logging.info(f"🤖 Выбранный AI провайдер: {args.ai_provider}")
+    logging.info(f"🧵 Количество потоков: {args.threads}")
+    logging.info(f"🔄 Рекурсивный поиск: {'Да' if args.recursive else 'Нет'}")
+    logging.info(f"🏥 Проверка здоровья сервера: {'Пропущена' if args.skip_health_check else 'Включена'}")
     
     # Проверка существования входной директории
     if not input_dir.exists():
@@ -450,9 +627,11 @@ def main() -> None:
         'm': args.m,
         'f': args.f,
         't': args.t,
+        'aiProvider': args.ai_provider 
     }
     
     # Создание клиента и обработка файлов
+    start_time = time.time()
     client = TranslationClient(args.server_url)
     client.process_files(
         jar_files,
@@ -461,8 +640,14 @@ def main() -> None:
         output_corrupted,
         params,
         max_threads=args.threads,
-        dry_run=args.dry_run
+        dry_run=args.dry_run,
+        skip_health_check=args.skip_health_check
     )
+    end_time = time.time()
+    
+    # Время выполнения
+    duration = end_time - start_time
+    logging.info(f"⏱️ Время выполнения: {duration:.2f} секунд ({duration/60:.2f} минут)")
     
     logging.info("="*60)
     logging.info("✅ ОБРАБОТКА ЗАВЕРШЕНА")

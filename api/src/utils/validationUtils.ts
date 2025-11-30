@@ -1,3 +1,4 @@
+//src/utils/validationUtils.ts
 import { config } from '../config/config';
 import { TranslationRequest, SupportedLanguage, TranslationMethod, TranslationModule } from './types';
 import { ValidationError, UnsupportedLanguageError, FileSizeLimitError, InvalidFileError } from './errorUtils';
@@ -290,6 +291,7 @@ export function validateFileProcessingParams(params: {
   m?: string;
   f?: string;
   t?: string;
+  aiProvider?: string;
 }): void {
   // Валидация fallback переводчика
   if (params.fb !== undefined) {
@@ -342,6 +344,17 @@ export function validateFileProcessingParams(params: {
   // Валидация целевого языка
   if (params.t !== undefined) {
     validateLanguage(String(params.t), 'target');
+  }
+
+  if (params.aiProvider !== undefined) {
+    const providerValue = String(params.aiProvider).toLowerCase();
+    const supportedProviders = config.translation.aiProviders;
+    if (!supportedProviders.includes(providerValue as any)) {
+      throw new ValidationError(
+        `Invalid AI provider: ${params.aiProvider}. Supported providers: ${supportedProviders.join(', ')}`,
+        { aiProvider: params.aiProvider, supportedProviders }
+      );
+    }
   }
 }
 

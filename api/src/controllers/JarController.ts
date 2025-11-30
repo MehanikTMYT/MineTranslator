@@ -16,6 +16,7 @@ export class JarController {
 
   async processJarFile(req: Request, res: Response, next: NextFunction): Promise<void> {
     let jarPath: string | undefined;
+    
 
     try {
       const options = req.body;
@@ -43,7 +44,8 @@ export class JarController {
         module: options.m,
         from: options.f,
         to: options.t,
-        method: options.translateMethod
+        method: options.translateMethod,
+        aiProvider: options.aiProvider 
       });
 
       // Validate translation options

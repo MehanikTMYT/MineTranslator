@@ -1,3 +1,4 @@
+//src/services/translation/TranslationService.ts
 import { TranslationRequest, TranslationResponse, TranslationMethod } from '../../utils/types';
 import { LocalTranslationService } from './LocalTranslationService';
 import { AiTranslationService } from '../ai/AiTranslationService';
@@ -235,15 +236,14 @@ export class TranslationService {
         // Если это последний метод и все методы завершились ошибкой
         if (method === methods[methods.length - 1]) {
           throw new TranslationError(
-            `All translation methods failed. Last error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            'TRANSLATION_FAILED'
+            `All translation methods failed. Last error: ${error instanceof Error ? error.message : 'Unknown error'}`
           );
         }
       }
     }
 
     // Если ни один метод не вернул результат
-    throw new TranslationError('No translations were produced by any method', 'TRANSLATION_FAILED');
+    throw new TranslationError('No translations were produced by any method');
   }
 
   /**

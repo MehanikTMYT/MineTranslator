@@ -1,3 +1,4 @@
+//src/services/ai/OllamaService.ts
 import fetch from 'node-fetch';
 import { config } from '../../config/config';
 import { TranslationRequest, TranslationResponse, TranslationResult } from '../../utils/types';
@@ -248,76 +249,79 @@ Return ONLY the JSON object with translations:`;
    * @private
    */
   private async parseTranslationResponse(response: any, request: TranslationRequest): Promise<TranslationResult> {
-    const successfulTranslations: Record<string, string> = {};
-    const failedTranslations: TranslationError[] = [];
+  const successfulTranslations: Record<string, string> = {};
+  const failedTranslations: TranslationError[] = [];
+  // Объявляем responseText вне try-блока, чтобы она была доступна в catch
+  let responseText = '';
+
+  try {
+    // Извлекаем текст из ответа Ollama
+    responseText = response.response || response.message?.content || response.content || '';
+    
+    if (!responseText) {
+      throw new TranslationError('Empty response from Ollama');
+    }
+
+    logger.debug('Raw Ollama response', { responseText: responseText.substring(0, 200) + '...' });
+
+    // Извлекаем JSON из текста (Ollama может добавлять дополнительный текст)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new TranslationError('No JSON object found in Ollama response');
+    }
+
+    const jsonString = jsonMatch[0];
+    let translations: Record<string, string>;
 
     try {
-      // Извлекаем текст из ответа Ollama
-      const responseText = response.response || response.message?.content || response.content || '';
-      
-      if (!responseText) {
-        throw new TranslationError('Empty response from Ollama');
-      }
-
-      logger.debug('Raw Ollama response', { responseText: responseText.substring(0, 200) + '...' });
-
-      // Извлекаем JSON из текста (Ollama может добавлять дополнительный текст)
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new TranslationError('No JSON object found in Ollama response');
-      }
-
-      const jsonString = jsonMatch[0];
-      let translations: Record<string, string>;
-
+      translations = JSON.parse(jsonString);
+    } catch (parseError) {
+      // Попробуем исправить распространенные ошибки в JSON
+      const cleanedJson = this.cleanJsonResponse(jsonString);
       try {
-        translations = JSON.parse(jsonString);
-      } catch (parseError) {
-        // Попробуем исправить распространенные ошибки в JSON
-        const cleanedJson = this.cleanJsonResponse(jsonString);
-        try {
-          translations = JSON.parse(cleanedJson);
-        } catch (secondParseError) {
-          logger.error('JSON parsing failed after cleaning', { 
-            originalJson: jsonString.substring(0, 200),
-            cleanedJson: cleanedJson.substring(0, 200),
-            error: secondParseError instanceof Error ? secondParseError.message : String(secondParseError)
-          });
-          throw new TranslationError(`Failed to parse JSON response: ${secondParseError instanceof Error ? secondParseError.message : 'Unknown error'}`);
-        }
+        translations = JSON.parse(cleanedJson);
+      } catch (secondParseError) {
+        logger.error('JSON parsing failed after cleaning', { 
+          originalJson: jsonString.substring(0, 200),
+          cleanedJson: cleanedJson.substring(0, 200),
+          error: secondParseError instanceof Error ? secondParseError.message : String(secondParseError)
+        });
+        throw new TranslationError(`Failed to parse JSON response: ${secondParseError instanceof Error ? secondParseError.message : 'Unknown error'}`);
       }
-
-      // Валидируем и фильтруем переводы
-      for (const key of request.keys) {
-        if (translations[key]) {
-          successfulTranslations[key] = this.postProcessTranslation(translations[key], request.targetLang);
-        } else {
-          failedTranslations.push(new TranslationError(`Missing translation for key: ${key}`));
-        }
-      }
-
-      // Проверяем, что все ключи переведены
-      if (Object.keys(successfulTranslations).length === 0) {
-        throw new TranslationError('No valid translations found in response');
-      }
-
-      return {
-        success: Object.keys(successfulTranslations).length > 0,
-        successfulTranslations,
-        failedTranslations
-      };
-
-    } catch (error) {
-      logger.error('Error parsing Ollama response', { error: error instanceof Error ? error.message : String(error) });
-      
-      // Если парсинг не удался, попробуем альтернативный подход
-      if (error instanceof TranslationError && error.message.includes('JSON')) {
-        return await this.fallbackParseResponse(responseText, request);
-      }
-
-      throw error;
     }
+
+    // Валидируем и фильтруем переводы
+    for (const key of request.keys) {
+      if (translations[key]) {
+        successfulTranslations[key] = this.postProcessTranslation(translations[key], request.targetLang);
+      } else {
+        failedTranslations.push(new TranslationError(`Missing translation for key: ${key}`));
+      }
+    }
+
+    // Проверяем, что все ключи переведены
+    if (Object.keys(successfulTranslations).length === 0) {
+      throw new TranslationError('No valid translations found in response');
+    }
+
+    return {
+      success: Object.keys(successfulTranslations).length > 0,
+      successfulTranslations,
+      failedTranslations
+    };
+
+  } catch (error) {
+    logger.error('Error parsing Ollama response', { error: error instanceof Error ? error.message : String(error) });
+    
+    // Если парсинг не удался, попробуем альтернативный подход
+    if (error instanceof TranslationError && error.message.includes('JSON')) {
+      // Теперь responseText доступна здесь
+      return await this.fallbackParseResponse(responseText, request);
+    }
+
+    throw error;
   }
+}
 
   /**
    * Очищает JSON ответ от лишних символов и исправляет распространенные ошибки
