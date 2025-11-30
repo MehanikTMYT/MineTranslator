@@ -83,12 +83,26 @@ jobs:
           ${{ matrix.os == 'windows-latest' && 'client/dist/translator-client-Windows.exe' || 
               matrix.os == 'macos-latest' && 'client/dist/translator-client-Darwin' || 
               'client/dist/translator-client-Linux' }}
+    - name: Prepare server package
+      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      run: |
+        cd api
+        # Create a server package directory
+        mkdir -p server-package
+        # Copy built files
+        cp -r dist/* server-package/
+        # Copy package files
+        cp package.json pnpm-lock.yaml server-package/
+        # Install production dependencies only
+        cd server-package
+        pnpm install --prod --frozen-lockfile
+      shell: bash
     - name: Upload server artifacts
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
       uses: actions/upload-artifact@v4
       with:
         name: translator-server-${{ matrix.os }}
-        path: api/dist/
+        path: api/server-package/
     - name: Set up Docker Buildx
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
       uses: docker/setup-buildx-action@v3
