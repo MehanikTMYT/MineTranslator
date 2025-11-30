@@ -17,7 +17,7 @@ This project provides a translation service with both server and client componen
 
 ## 🚀 Installation and Setup
 
-### Quick Start with Pre-built Binaries
+### Quick Start with Pre-built Binaries (dont work yet)
 
 Download the appropriate binary for your OS from the [Releases](https://github.com/MehanikTMYT/MineTranslator/releases) page:
 
