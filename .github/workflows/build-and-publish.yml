@@ -16,18 +16,21 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
     - name: Set up Node.js
-      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      if: matrix.role == 'server'
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'npm'
+        cache: 'pnpm'
+        # Cache based on the lock file in the api directory
+        cache-dependency-path: api/pnpm-lock.yaml
     - name: Install pnpm
-      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
-      run: |
-        npm install -g pnpm@9.0.0
-      shell: bash
+      if: matrix.role == 'server'
+      uses: pnpm/action-setup@v4
+      with:
+        version: 9.0.0
+        run_install: true
     - name: Install dependencies for server
-      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      if: matrix.role == 'server'
       run: |
         cd api
         pnpm install --frozen-lockfile
@@ -83,7 +86,9 @@ jobs:
       with:
         name: translator-client-${{ matrix.os }}
         path: |
-          ${{ matrix.os == 'windows-latest' && 'client/dist/translator-client-Windows.exe' || (matrix.os == 'macos-latest' && 'client/dist/translator-client-Darwin' || 'client/dist/translator-client-Linux') }}
+          ${{ matrix.os == 'windows-latest' && 'client/dist/translator-client-Windows.exe' || 
+              matrix.os == 'macos-latest' && 'client/dist/translator-client-Darwin' || 
+              'client/dist/translator-client-Linux' }}
     - name: Upload server artifacts
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
       uses: actions/upload-artifact@v4
@@ -106,20 +111,19 @@ jobs:
         GHCR_REPOSITORY: ${{ github.repository }}
       run: |
         cd api
-        # Извлекаем owner и repo из полного имени репозитория
-        OWNER=$(echo "${GHCR_REPOSITORY}" | cut -d '/' -f 1 | tr '[:upper:]' '[:lower:]')
-        REPO=$(echo "${GHCR_REPOSITORY}" | cut -d '/' -f 2 | tr '[:upper:]' '[:lower:]')
+        OWNER=$(echo "$GHCR_REPOSITORY" | cut -d '/' -f 1 | tr '[:upper:]' '[:lower:]')
+        REPO=$(echo "$GHCR_REPOSITORY" | cut -d '/' -f 2 | tr '[:upper:]' '[:lower:]')
         BASE_IMAGE="ghcr.io/${OWNER}/${REPO}"
         TAG_LATEST="${BASE_IMAGE}:latest"
         TAG_COMMIT="${BASE_IMAGE}:${GITHUB_SHA::7}"
-        TAG_VERSION="${BASE_IMAGE}:3.5.0"  # Обновите версию при необходимости
+        TAG_VERSION="${BASE_IMAGE}:3.5.0"
         echo "Building Docker image with tags:"
         echo "  - $TAG_LATEST"
         echo "  - $TAG_COMMIT"
         echo "  - $TAG_VERSION"
-        docker build -t ${TAG_LATEST} -t ${TAG_COMMIT} -t ${TAG_VERSION} .
-        docker push ${TAG_LATEST}
-        docker push ${TAG_COMMIT}
-        docker push ${TAG_VERSION}
+        docker build -t $TAG_LATEST -t $TAG_COMMIT -t $TAG_VERSION .
+        docker push $TAG_LATEST
+        docker push $TAG_COMMIT
+        docker push $TAG_VERSION
         echo "Docker images successfully pushed to GHCR"
       shell: bash
