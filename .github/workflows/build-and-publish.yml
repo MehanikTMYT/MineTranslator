@@ -19,7 +19,7 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Node.js with pnpm
+    - name: Set up Node.js
       if: matrix.role == 'server'
       uses: actions/setup-node@v4
       with:
@@ -27,11 +27,13 @@ jobs:
         cache: 'pnpm'
         cache-dependency-path: api/pnpm-lock.yaml
 
-    - name: Enable Corepack and install pnpm
+    - name: Install and configure pnpm
       if: matrix.role == 'server'
       run: |
         corepack enable
         corepack prepare pnpm@9.0.0 --activate
+        echo "$(pnpm root -g)/bin" >> $GITHUB_PATH
+        pnpm --version
 
     - name: Set up Python
       if: matrix.role == 'client'
