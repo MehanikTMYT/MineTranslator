@@ -13,12 +13,13 @@ This project provides a translation service with both server and client componen
 - Cross-platform binary builds via GitHub Actions
 - Configurable via environment variables
 - Automated publishing of releases
+- Pre-built binaries and server files available
 
 ## 🚀 Installation and Setup
 
 ### Quick Start with Pre-built Binaries
 
-Download the appropriate binary for your OS from the [Releases](https://github.com/your-repo/releases) page:
+Download the appropriate binary for your OS from the [Releases](https://github.com/MehanikTMYT/MineTranslator/releases) page:
 
 1. Download the binary for your operating system (Windows, macOS, Linux)
 2. Make it executable (on Linux/macOS: `chmod +x translator-client`)
@@ -29,12 +30,12 @@ Download the appropriate binary for your OS from the [Releases](https://github.c
 
 Server:
 ```bash
-docker run -d -p 8250:8250 --env-file .env ghcr.io/your-username/translator-service:latest
+docker run -d -p 8250:8250 --env-file .env ghcr.io/mehaniktmyt/translator-service:latest
 ```
 
 Client:
 ```bash
-docker run -it --env-file .env -v $(pwd)/input:/input -v $(pwd)/output:/output ghcr.io/your-username/translator-client:latest
+docker run -it --env-file .env -v $(pwd)/input:/input -v $(pwd)/output:/output ghcr.io/mehaniktmyt/translator-client:latest
 ```
 
 ### From Source
@@ -311,7 +312,7 @@ Create a `docker-compose.yml` file:
 version: '3.8'
 services:
   server:
-    image: ghcr.io/your-username/translator-service:latest
+    image: ghcr.io/mehaniktmyt/translator-service:latest
     ports:
       - "8250:8250"
     env_file:
@@ -321,7 +322,7 @@ services:
       - SERVER_PORT=8250
 
   client:
-    image: ghcr.io/your-username/translator-client:latest
+    image: ghcr.io/mehaniktmyt/translator-client:latest
     volumes:
       - ./input:/input
       - ./output:/output
@@ -351,7 +352,7 @@ Then modify the values as needed for your setup.
 If you encounter any problems:
 
 1. Check this documentation
-2. Look through existing [Issues](https://github.com/your-repo/issues)
+2. Look through existing [Issues](https://github.com/MehanikTMYT/MineTranslator/issues)
 3. Create a new issue with detailed information about your problem
 
 For advanced users who want to modify the code, see [ADVANCED-USERS.md](ADVANCED-USERS.md).
