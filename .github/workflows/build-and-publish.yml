@@ -1,11 +1,9 @@
 name: Build and Publish
-
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-
 jobs:
   build:
     runs-on: ${{ matrix.os }}
@@ -14,26 +12,32 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         role: [client, server]
       fail-fast: false
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
     - name: Set up Node.js
-      if: matrix.role == 'server'
+      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'pnpm'
-        cache-dependency-path: api/pnpm-lock.yaml
-
+        cache: 'npm'
     - name: Install pnpm
-      if: matrix.role == 'server'
-      uses: pnpm/action-setup@v4
-      with:
-        version: 9.0.0
-        run_install: false
-
+      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      run: |
+        npm install -g pnpm@9.0.0
+      shell: bash
+    - name: Install dependencies for server
+      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      run: |
+        cd api
+        pnpm install --frozen-lockfile
+      shell: bash
+    - name: Build server
+      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      run: |
+        cd api
+        pnpm build
+      shell: bash
     - name: Set up Python
       if: matrix.role == 'client'
       uses: actions/setup-python@v5
@@ -41,34 +45,18 @@ jobs:
         python-version: '3.9'
         cache: 'pip'
         cache-dependency-path: client/requirements.txt
-
-    - name: Install dependencies for server
-      if: matrix.role == 'server'
-      run: |
-        cd api
-        pnpm install --frozen-lockfile
-      shell: bash
-
     - name: Install dependencies for client
       if: matrix.role == 'client'
       run: |
         cd client
         pip install -r requirements.txt
-
-    - name: Build server
-      if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
-      run: |
-        cd api
-        pnpm build
       shell: bash
-
     - name: Build client
       if: matrix.role == 'client'
       shell: bash
       run: |
         cd client
         pip install pyinstaller==6.10.0
-        
         if [ "${{ matrix.os }}" = "windows-latest" ]; then
           OUTPUT_NAME="translator-client-Windows.exe"
           pyinstaller --onefile main.py -n translator-client-Windows
@@ -79,9 +67,7 @@ jobs:
           OUTPUT_NAME="translator-client-Linux"
           pyinstaller --onefile main.py -n translator-client-Linux
         fi
-        
         echo "Built client executable: $OUTPUT_NAME"
-
     - name: List dist directory
       if: matrix.role == 'client'
       shell: bash
@@ -91,7 +77,6 @@ jobs:
         echo "::group::File details"
         file *
         echo "::endgroup::"
-
     - name: Upload client artifacts
       if: matrix.role == 'client'
       uses: actions/upload-artifact@v4
@@ -99,18 +84,15 @@ jobs:
         name: translator-client-${{ matrix.os }}
         path: |
           ${{ matrix.os == 'windows-latest' && 'client/dist/translator-client-Windows.exe' || (matrix.os == 'macos-latest' && 'client/dist/translator-client-Darwin' || 'client/dist/translator-client-Linux') }}
-
     - name: Upload server artifacts
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
       uses: actions/upload-artifact@v4
       with:
         name: translator-server-${{ matrix.os }}
         path: api/dist/
-
     - name: Set up Docker Buildx
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
       uses: docker/setup-buildx-action@v3
-
     - name: Log in to GitHub Container Registry
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest' && github.ref == 'refs/heads/main'
       uses: docker/login-action@v3
@@ -118,32 +100,26 @@ jobs:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.CR_PAT }}
-
     - name: Build and push Docker image
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest' && github.ref == 'refs/heads/main'
       env:
         GHCR_REPOSITORY: ${{ github.repository }}
       run: |
         cd api
-        
         # Извлекаем owner и repo из полного имени репозитория
         OWNER=$(echo "${GHCR_REPOSITORY}" | cut -d '/' -f 1 | tr '[:upper:]' '[:lower:]')
         REPO=$(echo "${GHCR_REPOSITORY}" | cut -d '/' -f 2 | tr '[:upper:]' '[:lower:]')
-        
         BASE_IMAGE="ghcr.io/${OWNER}/${REPO}"
         TAG_LATEST="${BASE_IMAGE}:latest"
         TAG_COMMIT="${BASE_IMAGE}:${GITHUB_SHA::7}"
         TAG_VERSION="${BASE_IMAGE}:3.5.0"  # Обновите версию при необходимости
-        
         echo "Building Docker image with tags:"
         echo "  - $TAG_LATEST"
         echo "  - $TAG_COMMIT"
         echo "  - $TAG_VERSION"
-        
         docker build -t ${TAG_LATEST} -t ${TAG_COMMIT} -t ${TAG_VERSION} .
         docker push ${TAG_LATEST}
         docker push ${TAG_COMMIT}
         docker push ${TAG_VERSION}
-        
         echo "Docker images successfully pushed to GHCR"
       shell: bash
