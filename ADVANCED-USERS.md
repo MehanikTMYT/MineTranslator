@@ -61,13 +61,65 @@ pip install -r requirements.txt
 python main.py --help
 ```
 
+## GitHub Actions and CI/CD
+
+The project includes a comprehensive CI/CD pipeline defined in `.github/workflows/build-and-publish.yml` that:
+
+### Workflow Features
+- Builds executables for multiple platforms (Windows, macOS, Linux)
+- Creates Docker images for both client and server
+- Publishes releases automatically to GitHub Container Registry
+- Runs tests on multiple operating systems
+- Performs security scanning
+- Implements automated versioning
+
+### Adding Private Keys to GitHub Actions
+
+To use private keys in your GitHub Actions workflow:
+
+1. **Add Secrets to Repository**:
+   - Go to repository Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - Add your private keys as secrets (e.g., `TRANSLATOR_API_KEY`, `CR_PAT`)
+
+2. **Reference in Workflow**:
+   ```yaml
+   env:
+     TRANSLATOR_API_KEY: ${{ secrets.TRANSLATOR_API_KEY }}
+   ```
+
+3. **Secure Usage in Jobs**:
+   ```yaml
+   - name: Configure API Key
+     run: echo "API_KEY=${{ secrets.TRANSLATOR_API_KEY }}\" >> $GITHUB_ENV
+   ```
+
+### Workflow Configuration
+
+The workflow is defined in `.github/workflows/build-and-publish.yml` and includes:
+- Build and test on Ubuntu, Windows, and macOS
+- Matrix strategy for parallel builds
+- Automated Docker image building and publishing
+- Cross-platform executable generation
+- Artifact publishing for each platform
+
+### Customizing the Workflow
+
+To customize the build workflow:
+
+1. Edit `.github/workflows/build-and-publish.yml`
+2. Modify the matrix strategy to add/remove platforms
+3. Adjust build steps as needed
+4. Update artifact names and paths
+5. Add additional testing or validation steps
+
 ## Customizing the Server
 
 ### Adding New Translation Providers
 
-To add a new translation provider, modify the server's translation logic in `api/src/app.ts`:
+To add a new translation provider, modify the server's translation logic in the services:
 
-1. Add the new provider's API endpoint and authentication
+1. Add the new provider's API endpoint and authentication in `api/src/services/translation/`
 2. Implement the translation function
 3. Update the server's routing to handle the new provider
 
@@ -181,6 +233,35 @@ Run client tests using:
 cd client
 python -m pytest
 ```
+
+## Security Best Practices
+
+### Private Key Management
+
+⚠️ **Security Warning**: Never commit private keys directly to the repository.
+
+Instead, use one of these secure methods:
+
+#### Method 1: Environment Variables (Recommended)
+1. Store your API keys in environment variables
+2. Reference them in your `.env` file
+3. Ensure `.env` is in `.gitignore`
+
+#### Method 2: GitHub Secrets for Actions
+1. Go to your repository Settings → Secrets and variables → Actions
+2. Add your secrets (e.g., `TRANSLATOR_API_KEY`, `CR_PAT`)
+3. Reference them in your workflow files
+
+#### Method 3: SSH Keys for Private Repositories
+1. Generate SSH keys: `ssh-keygen -t rsa -b 4096`
+2. Add public key to GitHub: Settings → SSH and GPG keys
+3. Use SSH URLs instead of HTTPS for repository access
+
+### Configuration Security
+- Always use `.env` files for configuration
+- Never hardcode sensitive information
+- Validate all user inputs
+- Use HTTPS for server connections
 
 ## Contributing
 
