@@ -322,7 +322,7 @@ class TranslationClient:
                     return False
             
             # Сохранение результата
-            output_file_name = f"{file_path.stem}_translated.jar"
+            output_file_name = f"{file_path.stem}.jar"
             output_file_path = output_dir / output_file_name
             
             output_dir.mkdir(parents=True, exist_ok=True)

@@ -138,7 +138,7 @@ def run_cli(args):
     if args.skip_existing and jar_files:
         existing_files = []
         for file_path in jar_files[:]:  # Создаем копию списка для итерации
-            output_file = output_dir / f"{file_path.stem}_translated.jar"
+            output_file = output_dir / f"{file_path.stem}.jar"
             if output_file.exists():
                 logging.info(f"⏭️ Пропуск существующего файла: {file_path.name}")
                 existing_files.append(file_path)
