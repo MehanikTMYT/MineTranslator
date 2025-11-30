@@ -22,11 +22,14 @@ jobs:
         cache: 'pnpm'
         # Cache based on the lock file in the api directory
         cache-dependency-path: api/pnpm-lock.yaml
-    - name: Install pnpm
+    - name: Setup pnpm
       uses: pnpm/action-setup@v4
       with:
         version: 9.0.0
         run_install: false
+    - name: Verify pnpm installation
+      run: pnpm --version
+      shell: bash
     - name: Install pnpm dependencies for server
       if: matrix.role == 'server'
       run: |
