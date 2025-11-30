@@ -190,10 +190,10 @@ class TranslationClient:
         
         # Проверка типа исключения
         if isinstance(exception, requests.exceptions.RequestException):
-            if hasattr(exception, 'response') and exception.response is not None:
+            # Проверяем, что response существует и не равен None
+            response = getattr(exception, 'response', None)
+            if response is not None:
                 # Обработка ошибок с ответом от сервера
-                response = exception.response
-                
                 try:
                     # Попытка получить детали ошибки из JSON
                     if response.headers.get('Content-Type', '').startswith('application/json'):
@@ -203,33 +203,43 @@ class TranslationClient:
                         error_message = response.text or str(exception)
                 except Exception as json_error:
                     logging.debug(f"Отладка: ошибка при парсинге JSON: {json_error}")
-                    error_message = response.text or str(exception)
+                    # Защита от случая, когда response.text также может быть недоступен
+                    try:
+                        error_message = response.text or str(exception)
+                    except AttributeError:
+                        error_message = str(exception)
+                        logging.debug(f"Отладка: ошибка при доступе к response.text: {exception}")
                 
                 # Анализ HTTP статуса
-                if 400 <= response.status_code < 500:
-                    # Клиентские ошибки
-                    error_lower = error_message.lower()
-                    if any(keyword in error_lower for keyword in ["поврежд", "corrupted", "invalid zip", "not a zip", "broken archive"]):
-                        error_type = "corrupted"
-                        self.move_file(file_path, output_corrupted)
-                        logging.error(f"🔧 Файл поврежден: {file_path.name} - {error_message}")
+                try:
+                    status_code = response.status_code
+                    if 400 <= status_code < 500:
+                        # Клиентские ошибки
+                        error_lower = error_message.lower()
+                        if any(keyword in error_lower for keyword in ["поврежд", "corrupted", "invalid zip", "not a zip", "broken archive"]):
+                            error_type = "corrupted"
+                            self.move_file(file_path, output_corrupted)
+                            logging.error(f"🔧 Файл поврежден: {file_path.name} - {error_message}")
+                        
+                        elif any(keyword in error_lower for keyword in ["отсутствует папка", "no folder", "missing folder", "assets", "lang", "resource", "translation"]):
+                            error_type = "invalid"
+                            self.move_file(file_path, output_invalid)
+                            logging.error(f"🧩 Неверная структура мода: {file_path.name} - {error_message}")
+                        
+                        else:
+                            error_type = "client_error"
+                            logging.error(f"⚠️ Ошибка клиента ({status_code}): {file_path.name} - {error_message}")
                     
-                    elif any(keyword in error_lower for keyword in ["отсутствует папка", "no folder", "missing folder", "assets", "lang", "resource", "translation"]):
-                        error_type = "invalid"
-                        self.move_file(file_path, output_invalid)
-                        logging.error(f"🧩 Неверная структура мода: {file_path.name} - {error_message}")
-                    
-                    else:
-                        error_type = "client_error"
-                        logging.error(f"⚠️ Ошибка клиента ({response.status_code}): {file_path.name} - {error_message}")
-                
-                elif 500 <= response.status_code < 600:
-                    # Серверные ошибки
-                    error_type = "server_error"
-                    with self.lock:
-                        self.stats['server_errors'] += 1
-                    logging.error(f"🔥 Серверная ошибка ({response.status_code}): {file_path.name} - {error_message}")
-            
+                    elif 500 <= status_code < 600:
+                        # Серверные ошибки
+                        error_type = "server_error"
+                        with self.lock:
+                            self.stats['server_errors'] += 1
+                        logging.error(f"🔥 Серверная ошибка ({status_code}): {file_path.name} - {error_message}")
+                except AttributeError:
+                    # Если не удается получить status_code
+                    error_type = "network_error"
+                    logging.error(f"🌐 Ошибка при получении статуса ответа: {file_path.name}")
             else:
                 # Обработка сетевых ошибок без ответа
                 if isinstance(exception, requests.exceptions.ConnectionError):
