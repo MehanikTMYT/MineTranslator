@@ -19,13 +19,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Set up Node.js
+    - name: Set up Node.js with pnpm
       if: matrix.role == 'server'
       uses: actions/setup-node@v4
       with:
         node-version: '18'
         cache: 'pnpm'
         cache-dependency-path: api/pnpm-lock.yaml
+
+    - name: Enable Corepack and install pnpm
+      if: matrix.role == 'server'
+      run: |
+        corepack enable
+        corepack prepare pnpm@9.0.0 --activate
 
     - name: Set up Python
       if: matrix.role == 'client'
@@ -39,8 +45,6 @@ jobs:
       if: matrix.role == 'server'
       run: |
         cd api
-        corepack enable
-        npm install -g pnpm@9
         pnpm install --frozen-lockfile
 
     - name: Install dependencies for client
