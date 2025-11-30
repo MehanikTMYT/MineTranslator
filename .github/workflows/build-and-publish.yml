@@ -71,8 +71,16 @@ jobs:
 
     - name: Build and push Docker image
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
+      env:
+        GHCR_USERNAME: ${{ github.actor }}
+        GHCR_REPOSITORY: ${{ github.repository_owner }}
       run: |
-        docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+        # Безопасный вход в Docker registry
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $GHCR_USERNAME --password-stdin
+        
+        # Конвертируем имя репозитория в нижний регистр
+        REPO_OWNER=$(echo "$GHCR_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+        
         cd api
-        docker build -t ghcr.io/${{ github.repository_owner }}/translator-service:latest .
-        docker push ghcr.io/${{ github.repository_owner }}/translator-service:latest
+        docker build -t ghcr.io/$REPO_OWNER/translator-service:latest .
+        docker push ghcr.io/$REPO_OWNER/translator-service:latest
