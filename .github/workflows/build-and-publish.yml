@@ -34,7 +34,7 @@ jobs:
       run: |
         cd api
         npm install -g pnpm
-        pnpm install --yes  # Добавлен флаг --yes для автоматического подтверждения
+        pnpm install --force  # Используем --force вместо --yes для pnpm
 
     - name: Install dependencies for client
       if: matrix.role == 'client'
@@ -74,16 +74,13 @@ jobs:
       env:
         GHCR_REPOSITORY: ${{ github.repository }}
       run: |
-        # Настройка credential store для устранения предупреждения
-        mkdir -p ~/.docker
-        echo '{ "credsStore": "desktop" }' > ~/.docker/config.json
-        
         # Безопасный вход в Docker registry
         echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
         
         cd api
-        # Используем путь к репозиторию вместо владельца для правильных прав доступа
-        IMAGE_NAME="ghcr.io/${GHCR_REPOSITORY,,}/translator-service:latest"
+        # Используем путь к репозиторию и преобразуем в нижний регистр
+        REPO_PATH=$(echo "${GHCR_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+        IMAGE_NAME="ghcr.io/${REPO_PATH}/translator-service:latest"
         
         docker build -t $IMAGE_NAME .
         docker push $IMAGE_NAME
