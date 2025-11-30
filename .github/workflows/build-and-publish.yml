@@ -1,9 +1,9 @@
 name: Build and Publish
 on:
   push:
-    branches: [ main ]
+    branches: [ qwen-code-555cfd0e-c1bd-4b18-a3c9-7e928e46c766 ]
   pull_request:
-    branches: [ main ]
+    branches: [ qwen-code-555cfd0e-c1bd-4b18-a3c9-7e928e46c766 ]
 jobs:
   build:
     runs-on: ${{ matrix.os }}
