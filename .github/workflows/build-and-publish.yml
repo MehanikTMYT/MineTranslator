@@ -19,14 +19,10 @@ jobs:
       uses: actions/setup-node@v4
       with:
         node-version: '18'
-        cache: 'pnpm'
-        # Cache based on the lock file in the api directory
-        cache-dependency-path: api/pnpm-lock.yaml
     - name: Install pnpm
       uses: pnpm/action-setup@v4
       with:
-        version: 9.0.0
-        run_install: true
+        version: 9
     - name: Install dependencies for server
       if: matrix.role == 'server'
       run: |
