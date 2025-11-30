@@ -95,7 +95,16 @@ def parse_arguments():
 
 def run_cli(args):
     """Запуск CLI режима"""
-    from translator_client import TranslationClient, find_jar_files, SUPPORTED_LANGUAGES, AI_PROVIDERS
+    try:
+        from translator_client import TranslationClient, find_jar_files, SUPPORTED_LANGUAGES, AI_PROVIDERS
+    except ImportError as e:
+        # Add the current directory to the path to ensure modules can be found
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if current_dir not in sys.path:
+            sys.path.insert(0, current_dir)
+        from translator_client import TranslationClient, find_jar_files, SUPPORTED_LANGUAGES, AI_PROVIDERS
     
     # Настройка путей
     input_dir = Path(args.input_dir).resolve()
@@ -178,7 +187,16 @@ def run_cli(args):
 
 def run_gui():
     """Запуск GUI режима"""
-    from gui.translator_gui import main as gui_main
+    try:
+        from gui.translator_gui import main as gui_main
+    except ImportError as e:
+        # Add the current directory to the path to ensure modules can be found
+        import sys
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        if current_dir not in sys.path:
+            sys.path.insert(0, current_dir)
+        from gui.translator_gui import main as gui_main
     gui_main()
 
 
