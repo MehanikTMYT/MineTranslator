@@ -25,7 +25,7 @@ jobs:
 
     - name: Set up Python
       if: matrix.role == 'client'
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.9'
 
@@ -33,7 +33,7 @@ jobs:
       if: matrix.role == 'server'
       run: |
         cd api
-        npm install -g pnpm
+        npm install -g pnpm@9
         pnpm install --force  # Используем --force вместо --yes для pnpm
 
     - name: Install dependencies for client
@@ -52,7 +52,7 @@ jobs:
       if: matrix.role == 'client'
       run: |
         cd client
-        pip install pyinstaller
+        pip install pyinstaller==6.10.0
         pyinstaller --onefile main.py -n translator-client-${{ runner.os }}
 
     - name: Upload client artifacts
@@ -74,13 +74,14 @@ jobs:
       env:
         GHCR_REPOSITORY: ${{ github.repository }}
       run: |
-        # Безопасный вход в Docker registry
-        echo "${{ secrets.CR_PAT}}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        # Безопасный вход в Docker registry с использованием PAT
+        echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
         
         cd api
-        # Используем путь к репозиторию и преобразуем в нижний регистр
-        REPO_PATH=$(echo "${GHCR_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
-        IMAGE_NAME="ghcr.io/${REPO_PATH}/translator-service:latest"
+        # Исправленный формат имени образа - используем только owner/repository
+        OWNER=$(echo "${GHCR_REPOSITORY}" | cut -d '/' -f 1 | tr '[:upper:]' '[:lower:]')
+        REPO=$(echo "${GHCR_REPOSITORY}" | cut -d '/' -f 2 | tr '[:upper:]' '[:lower:]')
+        IMAGE_NAME="ghcr.io/${OWNER}/${REPO}:latest"
         
         docker build -t $IMAGE_NAME .
         docker push $IMAGE_NAME
