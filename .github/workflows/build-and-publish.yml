@@ -34,7 +34,7 @@ jobs:
       run: |
         cd api
         npm install -g pnpm
-        pnpm install
+        pnpm install --yes  # Добавлен флаг --yes для автоматического подтверждения
 
     - name: Install dependencies for client
       if: matrix.role == 'client'
@@ -72,15 +72,18 @@ jobs:
     - name: Build and push Docker image
       if: matrix.role == 'server' && matrix.os == 'ubuntu-latest'
       env:
-        GHCR_USERNAME: ${{ github.actor }}
-        GHCR_REPOSITORY: ${{ github.repository_owner }}
+        GHCR_REPOSITORY: ${{ github.repository }}
       run: |
-        # Безопасный вход в Docker registry
-        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u $GHCR_USERNAME --password-stdin
+        # Настройка credential store для устранения предупреждения
+        mkdir -p ~/.docker
+        echo '{ "credsStore": "desktop" }' > ~/.docker/config.json
         
-        # Конвертируем имя репозитория в нижний регистр
-        REPO_OWNER=$(echo "$GHCR_REPOSITORY" | tr '[:upper:]' '[:lower:]')
+        # Безопасный вход в Docker registry
+        echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
         
         cd api
-        docker build -t ghcr.io/$REPO_OWNER/translator-service:latest .
-        docker push ghcr.io/$REPO_OWNER/translator-service:latest
+        # Используем путь к репозиторию вместо владельца для правильных прав доступа
+        IMAGE_NAME="ghcr.io/${GHCR_REPOSITORY,,}/translator-service:latest"
+        
+        docker build -t $IMAGE_NAME .
+        docker push $IMAGE_NAME
