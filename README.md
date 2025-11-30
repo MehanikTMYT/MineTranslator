@@ -192,13 +192,87 @@ For advanced users who want to set up their own server, please refer to [README-
 
 ## 🚀 GitHub Actions and Automated Builds
 
-The project includes automated build workflows that:
-- Build binaries for multiple platforms (Windows, macOS, Linux)
-- Create Docker images for both client and server
-- Publish releases automatically
-- Run tests on multiple operating systems
+The project includes comprehensive CI/CD workflows located in `.github/workflows/build-and-publish.yml` that:
 
-To use the automated builds, simply push changes to the `main` branch, and the workflow will automatically build and publish new versions.
+### Workflow Features
+- Build executables for multiple platforms (Windows, macOS, Linux)
+- Create Docker images for both client and server
+- Publish releases automatically to GitHub Container Registry
+- Run tests on multiple operating systems
+- Perform security scanning
+- Implement automated versioning
+
+### Adding Private Keys to GitHub Actions
+
+To use private keys in your GitHub Actions workflow:
+
+1. **Add Secrets to Repository**:
+   - Go to repository Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - Add your private keys as secrets (e.g., `TRANSLATOR_API_KEY`, `CR_PAT`)
+
+2. **Reference in Workflow**:
+   ```yaml
+   env:
+     TRANSLATOR_API_KEY: ${{ secrets.TRANSLATOR_API_KEY }}
+   ```
+
+3. **Secure Usage in Jobs**:
+   ```yaml
+   - name: Configure API Key
+     run: echo "API_KEY=${{ secrets.TRANSLATOR_API_KEY }}" >> $GITHUB_ENV
+   ```
+
+### Workflow Configuration
+
+The workflow is defined in `.github/workflows/build-and-publish.yml` and includes:
+- Build and test on Ubuntu, Windows, and macOS
+- Matrix strategy for parallel builds
+- Automated Docker image building and publishing
+- Cross-platform executable generation
+- Artifact publishing for each platform
+
+### Workflow Triggers
+
+The workflow runs automatically on:
+- Push to `main` branch (builds and publishes)
+- Pull requests to `main` branch (runs tests only)
+- Manual dispatch (for testing)
+
+To customize the workflow, edit `.github/workflows/build-and-publish.yml` and modify:
+- Matrix strategy to add/remove platforms
+- Build steps as needed
+- Artifact names and paths
+- Additional testing or validation steps
+
+## 🔐 Private Key and Security Setup
+
+### Adding Private Keys to Repository
+
+⚠️ **Security Warning**: Never commit private keys directly to the repository.
+
+Instead, use one of these secure methods:
+
+#### Method 1: Environment Variables (Recommended)
+1. Store your API keys in environment variables
+2. Reference them in your `.env` file
+3. Ensure `.env` is in `.gitignore`
+
+#### Method 2: GitHub Secrets for Actions
+1. Go to your repository Settings → Secrets and variables → Actions
+2. Add your secrets (e.g., `TRANSLATOR_API_KEY`, `CR_PAT`)
+3. Reference them in your workflow files
+
+#### Method 3: SSH Keys for Private Repositories
+1. Generate SSH keys: `ssh-keygen -t rsa -b 4096`
+2. Add public key to GitHub: Settings → SSH and GPG keys
+3. Use SSH URLs instead of HTTPS for repository access
+
+### Configuration Security
+- Always use `.env` files for configuration
+- Never hardcode sensitive information
+- Validate all user inputs
+- Use HTTPS for server connections
 
 ## 🤝 Contributing
 
