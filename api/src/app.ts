@@ -87,6 +87,14 @@ export class Application {
       });
     });
 
+    this.app.get('/health', (_, res) => {
+      res.json({
+        status: 'healthy',
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString()
+      });
+    });
+
     this.app.use('/process', jarRoutes);
     this.app.use('*', notFoundHandler);
   }
