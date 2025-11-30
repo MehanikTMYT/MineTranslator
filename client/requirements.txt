@@ -1,2 +1,3 @@
 requests
 tqdm
+# tkinter included in Python standard library, but may need system package python3-tk
