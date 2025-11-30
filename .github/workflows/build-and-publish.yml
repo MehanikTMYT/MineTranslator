@@ -56,13 +56,13 @@ jobs:
         pip install pyinstaller==6.10.0
         if [ "${{ matrix.os }}" = "windows-latest" ]; then
           OUTPUT_NAME="translator-client-Windows.exe"
-          pyinstaller --onefile main.py -n translator-client-Windows
+          pyinstaller --onefile --hidden-import=translator_client --hidden-import=gui.translator_gui main.py -n translator-client-Windows
         elif [ "${{ matrix.os }}" = "macos-latest" ]; then
           OUTPUT_NAME="translator-client-Darwin"
-          pyinstaller --onefile main.py -n translator-client-Darwin
+          pyinstaller --onefile --hidden-import=translator_client --hidden-import=gui.translator_gui main.py -n translator-client-Darwin
         else
           OUTPUT_NAME="translator-client-Linux"
-          pyinstaller --onefile main.py -n translator-client-Linux
+          pyinstaller --onefile --hidden-import=translator_client --hidden-import=gui.translator_gui main.py -n translator-client-Linux
         fi
         echo "Built client executable: $OUTPUT_NAME"
     - name: List dist directory
